@@ -39,15 +39,18 @@
         "targetName": "test"
       },
       "exclude": [
-        "apps/unit-service-e2e/**/*"
+        "apps/unit-service-e2e/**/*",
+        "apps/api-gateway-e2e/**/*",
+        "apps/ingestion-service-e2e/**/*",
+        "apps/calculation-service-e2e/**/*",
+        "apps/alarm-service-e2e/**/*",
+        "apps/report-service-e2e/**/*"
       ]
     }
   ],
   "targetDefaults": {
     "test": {
-      "dependsOn": [
-        "^build"
-      ]
+      "dependsOn": ["^build"]
     }
   }
 }
