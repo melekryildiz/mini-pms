@@ -8,6 +8,36 @@
     },
     {
       "path": "./apps/unit-service"
+    },
+    {
+      "path": "./apps/api-gateway-e2e"
+    },
+    {
+      "path": "./apps/api-gateway"
+    },
+    {
+      "path": "./apps/ingestion-service-e2e"
+    },
+    {
+      "path": "./apps/ingestion-service"
+    },
+    {
+      "path": "./apps/calculation-service-e2e"
+    },
+    {
+      "path": "./apps/calculation-service"
+    },
+    {
+      "path": "./apps/alarm-service-e2e"
+    },
+    {
+      "path": "./apps/alarm-service"
+    },
+    {
+      "path": "./apps/report-service-e2e"
+    },
+    {
+      "path": "./apps/report-service"
     }
   ]
 }

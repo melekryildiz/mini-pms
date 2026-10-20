@@ -1,0 +1,26 @@
+{
+  "name": "ingestion-service-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "implicitDependencies": [
+      "ingestion-service"
+    ],
+    "targets": {
+      "e2e": {
+        "executor": "@nx/jest:jest",
+        "outputs": [
+          "{projectRoot}/test-output/jest/coverage"
+        ],
+        "dependsOn": [
+          "ingestion-service:build",
+          "ingestion-service:serve"
+        ],
+        "options": {
+          "jestConfig": "apps/ingestion-service-e2e/jest.config.cts",
+          "passWithNoTests": true
+        }
+      }
+    }
+  }
+}
