@@ -3,23 +3,22 @@
 
 ## 1. System Architecture
 
-
 ```mermaid
 flowchart LR
 
-    Browser["Browser"]
-
     subgraph PUBLIC["Public-Facing Layer"]
         direction TB
+        Browser["Browser"]
         Web["Next.js Web / Auth.js"]
         Keycloak["Keycloak"]
         Gateway["API Gateway"]
     end
 
     subgraph PRIVATE["Private Internal Network"]
-        direction TB
+        direction LR
 
         subgraph BROKERS["Messaging"]
+            direction TB
             RabbitMQ[["RabbitMQ"]]
             Kafka[["Kafka"]]
         end
@@ -43,6 +42,11 @@ flowchart LR
         end
     end
 
+    %% Left-to-right layout anchors
+    Gateway ~~~ RabbitMQ
+    RabbitMQ ~~~ Unit
+    Unit ~~~ PostgreSQL
+
     %% Authentication
     Browser -->|"HTTPS"| Web
     Browser -->|"HTTPS / OIDC Login"| Keycloak
@@ -58,16 +62,18 @@ flowchart LR
     RabbitMQ <-->|"RPC: mpms.alarm"| Alarm
     RabbitMQ <-->|"RPC: mpms.report"| Report
 
-    %% Asynchronous measurement flow
-    Simulator -->|"Kafka: mpms.measurement.raw"| Kafka
+    %% Measurement flow
+    Simulator -->|"Produce: mpms.measurement.raw"| Kafka
     Kafka -->|"Consume: mpms.measurement.raw"| Ingestion
     Ingestion -->|"Produce: mpms.measurement.dlq"| Kafka
 
-    %% Background jobs
+    %% Calculation jobs
     Calculation -->|"Publish: mpms.calculation.jobs"| RabbitMQ
     RabbitMQ -->|"Consume: mpms.calculation.jobs"| Calculation
-    Report -->|"Publish: mpms.report.jobs"| RabbitMQ
-    RabbitMQ -->|"Consume: mpms.report.jobs"| Report
+
+    %% Redis report queue
+    Report -->|"RPUSH: report:queue"| Redis
+    Redis -->|"BLPOP: report:queue"| Report
 
     %% Kafka events
     Calculation -->|"Produce: mpms.calculation.result"| Kafka
@@ -85,11 +91,11 @@ flowchart LR
     Browser <-->|"WSS / JWT"| Gateway
 
     %% PostgreSQL
-    Unit <-->|"SQL: Unit / Meter / Limit R-W"| PostgreSQL
+    Unit <-->|"SQL: Unit / Device / Limit R-W"| PostgreSQL
     Ingestion -->|"SQL: Measurement Upsert"| PostgreSQL
     Calculation <-->|"SQL: Measurement Read / Result Write"| PostgreSQL
     Alarm <-->|"SQL: Alarm R-W"| PostgreSQL
-    Report <-->|"SQL: Report Request R-W"| PostgreSQL
+    Report <-->|"SQL: Report Request R-W / Recovery"| PostgreSQL
 
     %% Redis
     Gateway <-->|"Redis: Unit Cache"| Redis
@@ -97,7 +103,7 @@ flowchart LR
     Ingestion <-->|"Redis: Latest Values / Idempotency"| Redis
     Calculation <-->|"Redis: Scheduler Lock"| Redis
 
-    %% Neo4j projection
+    %% Neo4j
     Unit <-->|"Bolt / Cypher: Topology Projection"| Neo4j
 
     %% Reporting
@@ -110,28 +116,24 @@ flowchart LR
     classDef broker fill:#FEF3C7,stroke:#D97706,color:#78350F
     classDef storage fill:#F3E8FF,stroke:#9333EA,color:#581C87
 
-    class Web,Keycloak,Gateway edge
+    class Browser,Web,Keycloak,Gateway edge
     class Unit,Ingestion,Calculation,Alarm,Report,Simulator service
     class RabbitMQ,Kafka broker
     class PostgreSQL,Redis,Neo4j,Jsreport storage
 ```
 
-
 ### Architecture Explanation
 
-1. The system separates public-facing components from internal backend services and infrastructure.
-2. Next.js handles user authentication through Keycloak, while the API Gateway validates JWT access tokens locally using JWKS.
-3. Synchronous requests use HTTP and RabbitMQ RPC, while asynchronous measurement and event processing uses Kafka and RabbitMQ work queues.
-4. The Unit, Ingestion, Calculation, Alarm, and Report services handle their respective business responsibilities.
-5. PostgreSQL is the primary source of truth, while Neo4j maintains a derived projection of the electrical network topology.
-6. Redis provides caching, latest measurement storage, idempotency checks, and distributed scheduler locks.
-7. Invalid measurement messages are sent to `mpms.measurement.dlq`, and failed calculation jobs can be handled through `mpms.calculation.jobs.dlx`.
-8. jsreport generates PDF and Excel documents, while the API Gateway provides authorized report downloads.
-9. Authenticated browser clients receive real-time notifications through WebSocket connections to the API Gateway.
+1. The Public-Facing Layer contains Next.js, Keycloak, and API Gateway.
+2. RabbitMQ handles synchronous RPC and calculation jobs; Kafka handles measurements and asynchronous events.
+3. Core Services implement unit management, ingestion, calculations, alarms, and reporting.
+4. PostgreSQL is the source of truth, while Neo4j maintains the electrical topology projection.
+5. Redis handles caching, latest measurements, scheduler locks, and report job queues.
+6. Report Service uses Redis `RPUSH` and `BLPOP` with a single worker pod.
+7. jsreport generates PDF and Excel documents.
+8. API Gateway delivers real-time notifications through WebSocket.
 
 ## 2. Multi-Replica WebSocket Distribution
-
-
 
 ```mermaid
 flowchart TB
@@ -165,16 +167,12 @@ flowchart TB
     G2 <-->|"WSS / JWT"| B2
 ```
 
-
-
-
 ### WebSocket Explanation
 
-1. API Gateway replicas consume Kafka events using the `mpms-gateway` consumer group.
-2. Kafka distributes event consumption among the replicas according to partition assignments.
-3. A Gateway replica receiving an event publishes the notification to the corresponding Redis Pub/Sub channel.
+1. Gateway replicas consume Kafka events through the `mpms-gateway` consumer group.
+2. Kafka distributes events according to partition assignments.
+3. The consuming Gateway publishes notifications to Redis Pub/Sub.
 4. All Gateway replicas subscribe to `ws:instant`, `ws:alarm`, and `ws:report`.
-5. Each Gateway forwards relevant notifications to its connected WebSocket clients.
-6. WebSocket connections require valid authentication and enforce authorization.
-7. If a Gateway replica disconnects, its clients must reconnect, and Redis Pub/Sub does not retain missed notifications.
-```
+5. Each Gateway forwards notifications to its connected WebSocket clients.
+6. WebSocket connections require authentication and authorization.
+7. Redis Pub/Sub does not retain missed notifications.
