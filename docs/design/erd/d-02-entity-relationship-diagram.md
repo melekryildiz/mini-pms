@@ -3,8 +3,8 @@
 ## 1. Entity Relationship Diagram
 
 ```mermaid
-erDiagram
 
+erDiagram
     organization_unit_type {
         bigint id PK "NOT NULL"
         varchar type UK "NOT NULL"
@@ -36,7 +36,7 @@ erDiagram
         bigint organization_unit_id FK "NOT NULL"
         varchar serial_no UK "NOT NULL"
         varchar role "NOT NULL"
-        boolean is_active "NOT NULL"
+        boolean is_active "NOT NULL, DEFAULT TRUE"
         timestamptz created_at "NOT NULL"
         varchar created_by "NOT NULL"
         timestamptz deleted_at "NULL"
@@ -75,7 +75,7 @@ erDiagram
         bigint id PK "NOT NULL"
         varchar job_name UK "NOT NULL"
         varchar cron_expression "NOT NULL"
-        boolean is_active "NOT NULL"
+        boolean is_active "NOT NULL, DEFAULT TRUE"
     }
 
     calculation_job {
@@ -83,8 +83,8 @@ erDiagram
         bigint organization_unit_id FK "NOT NULL"
         bigint cron_job_definition_id FK "NULL"
         timestamptz period_start "NOT NULL"
-        varchar status "NOT NULL"
-        integer retry_count "NOT NULL"
+        varchar status "NOT NULL, DEFAULT PENDING"
+        integer retry_count "NOT NULL, DEFAULT 0"
         timestamptz created_at "NOT NULL"
     }
 
@@ -122,7 +122,7 @@ erDiagram
         bigint organization_unit_id FK "NOT NULL"
         varchar alarm_type "NOT NULL"
         varchar status "NOT NULL"
-        integer occurrence_count "NOT NULL"
+        integer occurrence_count "NOT NULL, DEFAULT 1"
         timestamptz last_seen_at "NOT NULL"
         varchar acknowledged_by "NULL"
     }
@@ -136,10 +136,17 @@ erDiagram
         bigint id PK "NOT NULL"
         bigint organization_unit_id FK "NOT NULL"
         bigint request_type_id FK "NOT NULL"
-        varchar status "NOT NULL"
+        varchar status "NOT NULL, DEFAULT PENDING"
+        varchar output_path "NULL"
+        uuid worker_token "NULL"
         jsonb parameters "NOT NULL"
         varchar requested_by "NOT NULL"
+        integer attempt_count "NOT NULL, DEFAULT 0"
+        timestamptz started_at "NULL"
+        timestamptz completed_at "NULL"
+        varchar last_error "NULL"
         timestamptz created_at "NOT NULL"
+        timestamptz locked_until "NULL"
     }
 
     organization_unit_type ||--o{ organization_unit : classifies
@@ -166,6 +173,7 @@ erDiagram
 
     request_type ||--o{ report_request : categorizes
     organization_unit ||--o{ report_request : reports
+
 ```
 
 ## 2. Constraints and Indexes
@@ -225,6 +233,51 @@ ON mini_pms.limit_exceedance (
     period_start,
     exceedance_type
 );
+
+-- System-generated reports must include a non-empty period.
+ALTER TABLE mini_pms.report_request
+ADD CONSTRAINT chk_system_report_period
+CHECK (
+    requested_by <> 'system'
+    OR (
+        parameters->>'period' IS NOT NULL
+        AND btrim(parameters->>'period') <> ''
+    )
+);
+
+-- Retry attempts cannot be negative.
+ALTER TABLE mini_pms.report_request
+ADD CONSTRAINT chk_report_attempt_count
+CHECK (attempt_count >= 0);
+
+-- An in-progress report must have an owner and a lease.
+ALTER TABLE mini_pms.report_request
+ADD CONSTRAINT chk_report_worker_lease
+CHECK (
+    status <> 'IN_PROGRESS'
+    OR (
+        worker_token IS NOT NULL
+        AND locked_until IS NOT NULL
+        AND started_at IS NOT NULL
+    )
+);
+
+-- A completed report must reference its output.
+ALTER TABLE mini_pms.report_request
+ADD CONSTRAINT chk_report_completed_output
+CHECK (
+    status <> 'COMPLETED'
+    OR (
+        output_path IS NOT NULL
+        AND completed_at IS NOT NULL
+    )
+);
+
+-- Speed up recovery of expired report leases.
+CREATE INDEX idx_report_request_expired_lease
+ON mini_pms.report_request (locked_until)
+WHERE status = 'IN_PROGRESS';
+
 ```
 
 ## 3. Status and Type Values
@@ -254,6 +307,12 @@ Values not explicitly defined in the requirements must be confirmed before imple
 - `organization_unit_log` and `device_log` preserve changes to organization unit and device data.
 - `acknowledged_by` identifies the operator who acknowledged an alarm.
 - `requested_by` identifies the user or system requesting a report.
+
+- `worker_token` is a UUID identifying the current report-processing attempt.
+  It is not a user identifier.
+- `requested_by` identifies the user or system that created the report request.
+- `attempt_count` tracks how many times a report request has been claimed
+  for processing.
 
 User identities are managed by Keycloak.
 
@@ -331,11 +390,13 @@ A failed job can be retried up to three times.
 
 A job with missing interval data can enter `NO_DATA`.
 
+
 ### 5.8 Report Requests
 
 The `request_type` table defines the available report types.
 
-Each `report_request` references `request_type.id` through `request_type_id`.
+Each `report_request` references `request_type.id`
+through `request_type_id`.
 
 System-generated reports must be unique for the combination of:
 
@@ -343,9 +404,83 @@ System-generated reports must be unique for the combination of:
 - `organization_unit_id`
 - `parameters->>'period'`
 
-This uniqueness rule applies only when `requested_by = 'system'`.
+This uniqueness rule applies only when
+`requested_by = 'system'`.
 
-The index prevents duplicate request records. Worker-level idempotency is also required to prevent duplicate report generation.
+System-generated report requests must include a non-empty
+`period` parameter.
+
+Manually requested reports may have multiple request records
+for the same report type, organization unit, and period.
+
+The unique index prevents duplicate system-generated
+request records.
+
+Worker-level idempotency is handled separately to prevent
+duplicate final report outputs for the same request.
+
+### 5.9 Report Worker Idempotency
+
+Report generation is processed asynchronously by workers
+through RabbitMQ.
+
+RabbitMQ messages may be redelivered if a worker crashes
+or fails to acknowledge a message.
+
+Each report request has a unique `id`, which is used
+as the idempotency key.
+
+A worker claims a report request through an atomic
+database update.
+
+The `worker_token` identifies the current processing
+attempt, while `locked_until` defines the lease
+expiration time.
+
+The `attempt_count` field tracks processing attempts.
+
+A healthy worker may renew its lease while generating
+a report.
+
+If the lease expires, another worker may reclaim
+the request.
+
+An expired worker must not be allowed to mark the
+request as completed after ownership has changed.
+
+PDF files are generated using temporary output locations
+associated with individual processing attempts.
+
+Each report request has a deterministic final output path,
+for example:
+
+`reports/{request_id}/report.pdf`
+
+The final output is stored in persistent storage.
+
+Atomic create-if-absent operations prevent overwriting
+an existing final report object.
+
+However, create-if-absent alone does not prevent an
+expired worker from publishing first.
+
+Final output publication must therefore be coordinated
+with worker ownership and validated before the request
+is marked as completed.
+
+If a worker crashes after storing the PDF but before
+updating PostgreSQL, a retrying worker can verify the
+existing output and recover the request.
+
+The request is marked as `COMPLETED` only after the
+final output has been successfully stored and verified.
+
+RabbitMQ acknowledgment is sent only after durable
+completion has been confirmed.
+
+This design targets one valid final output per report
+request, although report computation may be retried.
+
 
 ## 6. Data Growth
 
@@ -367,3 +502,15 @@ Monthly table partitioning is an optional optimization.
 - Foreign keys must reference the updated table names.
 - `organization_unit_type` and `request_type` require initial seed data.
 - Database migrations must preserve all uniqueness and referential integrity constraints.
+- `report_request.status` defaults to `PENDING`.
+- `report_request.attempt_count` defaults to `0`.
+- Nullable report-processing fields remain NULL until
+  their corresponding processing stage.
+- Report-processing state transitions must preserve
+  worker ownership and lease consistency.
+- System-generated report requests must include a
+  non-empty period parameter.
+- Database migrations must implement the documented
+  CHECK constraints and indexes.
+- Report output storage must support safe publication
+  and recovery after worker failures.
