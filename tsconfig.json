@@ -38,6 +38,12 @@
     },
     {
       "path": "./apps/report-service"
+    },
+    {
+      "path": "./apps/web-e2e"
+    },
+    {
+      "path": "./apps/web"
     }
   ]
 }
