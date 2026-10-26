@@ -17,3 +17,6 @@ test-output
 out
 vitest.config.*.timestamp*
 .vitest
+
+# jsreport runtime data
+/infra/jsreport/data/
