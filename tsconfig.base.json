@@ -16,6 +16,7 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["mini-pms"]
+    "customConditions": ["mini-pms"],
+    "experimentalDecorators": true
   }
 }
