@@ -9,3 +9,4 @@ allowBuilds:
   '@swc/core': false
   '@nestjs/core': false
   sharp: false
+  esbuild: set this to true or false
