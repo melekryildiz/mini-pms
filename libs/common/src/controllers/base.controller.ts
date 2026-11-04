@@ -42,7 +42,7 @@ export abstract class BaseController<T extends IBaseEntity> {
         const entity = await this.service.update(id,data,updated_by);
 
         return {
-            success: true,
+            success: entity !== null,
             data: entity,
             message: entity
             ? 'Record updated successfully'

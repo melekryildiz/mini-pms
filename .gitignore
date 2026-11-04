@@ -20,3 +20,5 @@ vitest.config.*.timestamp*
 
 # jsreport runtime data
 /infra/jsreport/data/
+
+*.tsbuildinfo

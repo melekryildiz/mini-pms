@@ -1,0 +1,13 @@
+{
+  "name": "@mini-pms/common",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "mini-pms": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}
