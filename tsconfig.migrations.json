@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [
+    "migrations/**/*.ts",
+    "apps/unit-service/src/data-source.ts"
+  ]
+}

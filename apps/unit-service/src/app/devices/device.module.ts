@@ -9,6 +9,7 @@ import { UnitEntity } from '../units/entities/unit.entity.js';
 import { DeviceService } from './device.service.js';
 import { DeviceOrchestrator } from './device.orchestrator.js';
 import { DeviceController } from './device.controller.js';
+import { DeviceRpcController } from './device-rpc.controller.js';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { DeviceController } from './device.controller.js';
       UnitEntity,
     ]),
   ],
-  controllers: [DeviceController],
+  controllers: [DeviceController,DeviceRpcController,],
   providers: [
     DeviceService,
     DeviceOrchestrator,

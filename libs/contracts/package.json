@@ -1,0 +1,18 @@
+{
+  "name": "@mini-pms/contracts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "mini-pms": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@nestjs/swagger": "11.4.8",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1"
+  }
+}

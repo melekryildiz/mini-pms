@@ -22,3 +22,8 @@ vitest.config.*.timestamp*
 /infra/jsreport/data/
 
 *.tsbuildinfo
+# jsreport runtime data
+infra/jsreport/data/
+
+# Local Postman workspace
+.postman/
