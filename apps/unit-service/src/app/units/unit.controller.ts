@@ -11,10 +11,14 @@ import {
 import { BaseController } from '@mini-pms/common';
 import { UnitEntity } from './entities/unit.entity.js';
 import { UnitService } from './unit.service.js';
-import { CreateUnitDto } from './dto/create-unit.dto.js';
-import { UpdateUnitDto } from './dto/update-unit.dto.js';
+import {
+  CreateUnitDto,
+  UpdateUnitDto,
+  ListUnitsQueryDto,
+} from '@mini-pms/contracts';
+
 import { Query } from '@nestjs/common';
-import { ListUnitsQueryDto } from './dto/list-units-query.dto.js';
+
 import type { FindOptionsWhere } from 'typeorm';
 import { UnitOrchestrator } from './unit.orchestrator.js';
 

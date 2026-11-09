@@ -13,8 +13,10 @@ import {
 
 import { DeviceService } from './device.service.js';
 import { DeviceOrchestrator } from './device.orchestrator.js';
-import { CreateDeviceDto } from './dto/create-device.dto.js';
-import { UpdateDeviceDto } from './dto/update-device.dto.js';
+import {
+  CreateDeviceDto,
+  UpdateDeviceDto,
+} from '@mini-pms/contracts';
 
 @Controller('devices')
 export class DeviceController {

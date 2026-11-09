@@ -1,6 +1,10 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
+import 'reflect-metadata';
+import { loadEnvFile } from 'node:process';
 
+
+loadEnvFile('.env');
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST ?? '127.0.0.1',
