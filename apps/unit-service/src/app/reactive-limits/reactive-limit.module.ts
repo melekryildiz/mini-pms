@@ -1,4 +1,3 @@
-
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
@@ -32,8 +31,6 @@ import { ReactiveLimitRpcController } from './reactive-limit-rpc.controller.js';
     ReactiveLimitOrchestrator,
   ],
 
-  exports: [
-    ReactiveLimitService,
-  ],
+  exports: [ReactiveLimitService],
 })
 export class ReactiveLimitModule {}

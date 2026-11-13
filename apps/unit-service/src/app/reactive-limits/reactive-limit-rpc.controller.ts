@@ -1,15 +1,6 @@
+import { Controller, HttpException, HttpStatus } from '@nestjs/common';
 
-import {
-  Controller,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
-
-import {
-  MessagePattern,
-  Payload,
-  RpcException,
-} from '@nestjs/microservices';
+import { MessagePattern, Payload, RpcException } from '@nestjs/microservices';
 
 import { ReactiveLimitService } from './reactive-limit.service.js';
 import { ReactiveLimitOrchestrator } from './reactive-limit.orchestrator.js';
@@ -35,9 +26,7 @@ export class ReactiveLimitRpcController {
    * 404 -> Kayıt bulunamadı
    * 409 -> Çakışan kayıt
    */
-  private async handleRpc<T>(
-    operation: () => Promise<T>,
-  ): Promise<T> {
+  private async handleRpc<T>(operation: () => Promise<T>): Promise<T> {
     try {
       return await operation();
     } catch (error) {
@@ -49,10 +38,7 @@ export class ReactiveLimitRpcController {
       }
 
       // Beklenmeyen hatayı logluyoruz.
-      console.error(
-        'Reactive Limit RPC unexpected error:',
-        error,
-      );
+      console.error('Reactive Limit RPC unexpected error:', error);
 
       throw new RpcException({
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
@@ -70,18 +56,14 @@ export class ReactiveLimitRpcController {
    * Orchestrator'a göndermeden önce Date'e çeviriyoruz.
    */
   @MessagePattern('reactiveLimit.create')
-  create(
-    @Payload() data: CreateReactiveLimitDto,
-  ) {
+  create(@Payload() data: CreateReactiveLimitDto) {
     return this.handleRpc(() =>
       this.reactiveLimitOrchestrator.create({
         organization_unit_id: data.organization_unit_id,
         limit_type: data.limit_type,
         limit_value: data.limit_value,
         valid_from: new Date(data.valid_from),
-        valid_to: data.valid_to
-          ? new Date(data.valid_to)
-          : null,
+        valid_to: data.valid_to ? new Date(data.valid_to) : null,
       }),
     );
   }
@@ -103,12 +85,9 @@ export class ReactiveLimitRpcController {
     },
   ) {
     return this.handleRpc(() =>
-      this.reactiveLimitOrchestrator.update(
-        payload.id,
-        {
-          limit_value: payload.dto.limit_value,
-        },
-      ),
+      this.reactiveLimitOrchestrator.update(payload.id, {
+        limit_value: payload.dto.limit_value,
+      }),
     );
   }
 
@@ -119,13 +98,9 @@ export class ReactiveLimitRpcController {
    * aktif reaktif limitlerini getirir.
    */
   @MessagePattern('reactiveLimit.findActiveByUnitId')
-  findActiveByUnitId(
-    @Payload() payload: { unitId: string },
-  ) {
+  findActiveByUnitId(@Payload() payload: { unitId: string }) {
     return this.handleRpc(() =>
-      this.reactiveLimitService.findActiveByUnitId(
-        payload.unitId,
-      ),
+      this.reactiveLimitService.findActiveByUnitId(payload.unitId),
     );
   }
 
@@ -136,12 +111,26 @@ export class ReactiveLimitRpcController {
    * reaktif limit kayıtlarını getirir.
    */
   @MessagePattern('reactiveLimit.findByUnitId')
-  findByUnitId(
-    @Payload() payload: { unitId: string },
+  findByUnitId(@Payload() payload: { unitId: string }) {
+    return this.handleRpc(() =>
+      this.reactiveLimitService.findByUnitId(payload.unitId),
+    );
+  }
+
+  @MessagePattern('reactiveLimit.findAll')
+  findAll(
+    @Payload()
+    payload: {
+      organization_unit_id: string;
+      page?: number;
+      limit?: number;
+    },
   ) {
     return this.handleRpc(() =>
-      this.reactiveLimitService.findByUnitId(
-        payload.unitId,
+      this.reactiveLimitService.getListByUnitId(
+        payload.organization_unit_id,
+        Number(payload.page ?? 1),
+        Number(payload.limit ?? 10),
       ),
     );
   }
@@ -152,13 +141,7 @@ export class ReactiveLimitRpcController {
    * Reaktif limit kaydını kendi ID'siyle getirir.
    */
   @MessagePattern('reactiveLimit.findById')
-  findById(
-    @Payload() payload: { id: string },
-  ) {
-    return this.handleRpc(() =>
-      this.reactiveLimitService.findById(
-        payload.id,
-      ),
-    );
+  findById(@Payload() payload: { id: string }) {
+    return this.handleRpc(() => this.reactiveLimitService.findById(payload.id));
   }
 }

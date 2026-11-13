@@ -16,6 +16,11 @@ module.exports = {
   transform: {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig]
   },
+  // NodeNext kaynak importlarındaki `.js` uzantısını test sırasında aynı
+  // konumdaki TypeScript kaynak dosyasına eşler.
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1'
+  },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: 'test-output/jest/coverage'
 };

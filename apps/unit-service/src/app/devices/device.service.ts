@@ -1,4 +1,3 @@
-
 import {
   Injectable,
   BadRequestException,
@@ -8,16 +7,9 @@ import {
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import {
-  Repository,
-  DeepPartial,
-  EntityManager,
-} from 'typeorm';
+import { Repository, DeepPartial, EntityManager } from 'typeorm';
 
-import type {
-  FindOptionsWhere,
-  FindOptionsOrder,
-} from 'typeorm';
+import type { FindOptionsWhere, FindOptionsOrder } from 'typeorm';
 
 import { BaseService } from '@mini-pms/common';
 
@@ -48,7 +40,6 @@ export class DeviceService extends BaseService<DeviceEntity> {
     created_by: string,
     manager?: EntityManager,
   ): Promise<DeviceEntity> {
-
     // Transaction varsa onun EntityManager'ını kullanıyoruz.
     // Böylece cihaz kaydı ve audit log aynı transaction'da
     // gerçekleştirilebilir.
@@ -61,12 +52,7 @@ export class DeviceService extends BaseService<DeviceEntity> {
       : this.repository.manager.getRepository(UnitEntity);
 
     // İstekten gelen cihaz bilgilerini ayırıyoruz.
-    const {
-      organization_unit_id,
-      serial_no,
-      role,
-      metadata,
-    } = data;
+    const { organization_unit_id, serial_no, role, metadata } = data;
 
     // 1. Zorunlu alanların gönderildiğini kontrol ediyoruz.
     if (!organization_unit_id || !serial_no || !role) {
@@ -85,9 +71,7 @@ export class DeviceService extends BaseService<DeviceEntity> {
     });
 
     if (!unit) {
-      throw new BadRequestException(
-        'Organization unit not found',
-      );
+      throw new BadRequestException('Organization unit not found');
     }
 
     // Pasif bir unit'e yeni cihaz bağlanmasını engelliyoruz.
@@ -107,9 +91,7 @@ export class DeviceService extends BaseService<DeviceEntity> {
     });
 
     if (existingDevice) {
-      throw new ConflictException(
-        'Device serial number already exists',
-      );
+      throw new ConflictException('Device serial number already exists');
     }
 
     // 4. Sadece izin verilen alanlarla entity oluşturuyoruz.
@@ -140,7 +122,6 @@ export class DeviceService extends BaseService<DeviceEntity> {
     updated_by: string,
     manager?: EntityManager,
   ): Promise<DeviceEntity> {
-
     // Transaction varsa tüm işlemler aynı manager üzerinden yürür.
     const deviceRepository = manager
       ? manager.getRepository(DeviceEntity)
@@ -164,12 +145,7 @@ export class DeviceService extends BaseService<DeviceEntity> {
 
     // 2. Güncellenmesine izin verdiğimiz alanları tanımlıyoruz.
     // Örneğin organization_unit_id değiştirilemez.
-    const allowedFields = [
-      'serial_no',
-      'role',
-      'metadata',
-      'is_active',
-    ];
+    const allowedFields = ['serial_no', 'role', 'metadata', 'is_active'];
 
     // İzin verilmeyen bir alan gönderilmiş mi?
     const invalidFields = Object.keys(data).filter(
@@ -183,18 +159,10 @@ export class DeviceService extends BaseService<DeviceEntity> {
     }
 
     // 3. Seri numarası değiştiriliyorsa kontrol ediyoruz.
-    if (
-      data.serial_no !== undefined &&
-      data.serial_no !== device.serial_no
-    ) {
+    if (data.serial_no !== undefined && data.serial_no !== device.serial_no) {
       // Yeni seri numarası boş olamaz.
-      if (
-        typeof data.serial_no !== 'string' ||
-        data.serial_no.trim() === ''
-      ) {
-        throw new BadRequestException(
-          'Invalid serial number',
-        );
+      if (typeof data.serial_no !== 'string' || data.serial_no.trim() === '') {
+        throw new BadRequestException('Invalid serial number');
       }
 
       // Aynı seri numarası başka bir cihazda kullanılıyor mu?
@@ -205,60 +173,38 @@ export class DeviceService extends BaseService<DeviceEntity> {
         },
       });
 
-      if (
-        existingDevice &&
-        existingDevice.id !== device.id
-      ) {
-        throw new ConflictException(
-          'Device serial number already exists',
-        );
+      if (existingDevice && existingDevice.id !== device.id) {
+        throw new ConflictException('Device serial number already exists');
       }
     }
 
     // 4. Role alanı gönderilmişse boş olmamalı.
     if (
       data.role !== undefined &&
-      (
-        typeof data.role !== 'string' ||
-        data.role.trim() === ''
-      )
+      (typeof data.role !== 'string' || data.role.trim() === '')
     ) {
-      throw new BadRequestException(
-        'Invalid device role',
-      );
+      throw new BadRequestException('Invalid device role');
     }
 
     // 5. Metadata bir JSON nesnesi olmalı.
     // null veya array kabul etmiyoruz.
     if (
       data.metadata !== undefined &&
-      (
-        data.metadata === null ||
+      (data.metadata === null ||
         typeof data.metadata !== 'object' ||
-        Array.isArray(data.metadata)
-      )
+        Array.isArray(data.metadata))
     ) {
-      throw new BadRequestException(
-        'Metadata must be an object',
-      );
+      throw new BadRequestException('Metadata must be an object');
     }
 
     // 6. is_active alanı yalnızca true/false olabilir.
-    if (
-      data.is_active !== undefined &&
-      typeof data.is_active !== 'boolean'
-    ) {
-      throw new BadRequestException(
-        'is_active must be a boolean',
-      );
+    if (data.is_active !== undefined && typeof data.is_active !== 'boolean') {
+      throw new BadRequestException('is_active must be a boolean');
     }
 
     // 7. Pasif cihaz yeniden aktif ediliyorsa
     // bağlı olduğu unit'in de aktif olması gerekir.
-    if (
-      data.is_active === true &&
-      !device.is_active
-    ) {
+    if (data.is_active === true && !device.is_active) {
       const unit = await unitRepository.findOne({
         where: {
           id: device.organization_unit_id,
@@ -306,7 +252,6 @@ export class DeviceService extends BaseService<DeviceEntity> {
     deleted_by: string,
     manager?: EntityManager,
   ): Promise<boolean> {
-
     // Transaction varsa aynı manager kullanılır.
     const deviceRepository = manager
       ? manager.getRepository(DeviceEntity)
@@ -342,9 +287,7 @@ export class DeviceService extends BaseService<DeviceEntity> {
    * ID ile tek bir cihaz getirir.
    * Soft delete edilmiş cihazları döndürmez.
    */
-  override async findOne(
-    id: string,
-  ): Promise<DeviceEntity | null> {
+  override async findOne(id: string): Promise<DeviceEntity | null> {
     return this.repository.findOne({
       where: {
         id,
@@ -365,44 +308,34 @@ export class DeviceService extends BaseService<DeviceEntity> {
     sortOrder: 'ASC' | 'DESC' = 'ASC',
     filters?: FindOptionsWhere<DeviceEntity>,
   ) {
-
     // Sayfa numarası pozitif bir tam sayı olmalı.
     if (!Number.isInteger(page) || page < 1) {
-      throw new BadRequestException(
-        'Page must be a positive integer',
-      );
+      throw new BadRequestException('Page must be a positive integer');
     }
 
     // Bir istekte en fazla 100 cihaz getirilebilir.
-    if (
-      !Number.isInteger(limit) ||
-      limit < 1 ||
-      limit > 100
-    ) {
-      throw new BadRequestException(
-        'Limit must be between 1 and 100',
-      );
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new BadRequestException('Limit must be between 1 and 100');
     }
 
     // findAndCount hem cihazları hem toplam kayıt sayısını döndürür.
-    const [data, total] =
-      await this.repository.findAndCount({
-        where: {
-          ...filters,
-          is_deleted: false,
-        },
+    const [data, total] = await this.repository.findAndCount({
+      where: {
+        ...filters,
+        is_deleted: false,
+      },
 
-        // Önceki sayfalardaki kayıtları atlıyoruz.
-        skip: (page - 1) * limit,
+      // Önceki sayfalardaki kayıtları atlıyoruz.
+      skip: (page - 1) * limit,
 
-        // Bu sayfada kaç kayıt getirileceğini belirliyoruz.
-        take: limit,
+      // Bu sayfada kaç kayıt getirileceğini belirliyoruz.
+      take: limit,
 
-        // Belirtilen alana göre ASC veya DESC sıralıyoruz.
-        order: {
-          [sortBy]: sortOrder,
-        } as FindOptionsOrder<DeviceEntity>,
-      });
+      // Belirtilen alana göre ASC veya DESC sıralıyoruz.
+      order: {
+        [sortBy]: sortOrder,
+      } as FindOptionsOrder<DeviceEntity>,
+    });
 
     return {
       data,

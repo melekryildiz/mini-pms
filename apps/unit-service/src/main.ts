@@ -1,5 +1,8 @@
-
-import { Logger, ValidationPipe } from '@nestjs/common';
+import {
+  Logger,
+  RequestMethod,
+  ValidationPipe,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app/app.module';
@@ -15,7 +18,20 @@ async function bootstrap() {
     }),
   );
 
-  app.setGlobalPrefix('api');
+  /**
+   * Business endpoint'leri /api altında kalır.
+   *
+   * Monitoring ve container healthcheck araçlarının standart /health
+   * adresini kullanabilmesi için yalnızca GET /health prefix dışında kalır.
+   */
+  app.setGlobalPrefix('api', {
+    exclude: [
+      {
+        path: 'health',
+        method: RequestMethod.GET,
+      },
+    ],
+  });
 
   // RabbitMQ üzerinden gelen RPC mesajlarını dinle
   app.connectMicroservice<MicroserviceOptions>(
@@ -40,10 +56,16 @@ async function bootstrap() {
 
   await app.startAllMicroservices();
   Logger.log('TEST: RabbitMQ microservice started');
-  const port = Number(process.env.PORT ?? 3000);
+  // Unit Service hibrit çalışır: iş akışında Gateway ile RabbitMQ üzerinden
+  // konuşur; doğrudan HTTP yüzeyi ise yerel teşhis/e2e için 3003'te kalır.
+  // Servise özel değişken, ortak PORT değerinin başka uygulamaları etkilemesini önler.
+  const port = Number(
+    process.env.UNIT_SERVICE_PORT ?? process.env.PORT ?? 3003,
+  );
   await app.listen(port);
 
   Logger.log(`HTTP: http://localhost:${port}/api`);
+  Logger.log(`Health: http://localhost:${port}/health`);
   Logger.log('RabbitMQ: listening on mpms.unit');
 }
 

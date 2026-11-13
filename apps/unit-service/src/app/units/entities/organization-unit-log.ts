@@ -11,7 +11,7 @@ import {
 })
 export class OrganizationUnitLogEntity {
   @PrimaryGeneratedColumn('identity', { type: 'bigint' })
-    id!: string;
+  id!: string;
 
   @Column({ type: 'bigint' })
   organization_unit_id!: string;

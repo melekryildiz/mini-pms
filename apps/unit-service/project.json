@@ -71,6 +71,28 @@
         }
       }
     },
+    "build-sync-topology": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "outputs": [
+        "{projectRoot}/dist-sync-topology"
+      ],
+      "options": {
+        "command": "webpack-cli build --config apps/unit-service/webpack.sync-topology.config.js",
+        "cwd": "."
+      }
+    },
+    "sync-topology": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "build-sync-topology"
+      ],
+      "cache": false,
+      "options": {
+        "command": "node apps/unit-service/dist-sync-topology/main.js",
+        "cwd": "."
+      }
+    },
     "test": {
       "options": {
         "passWithNoTests": true

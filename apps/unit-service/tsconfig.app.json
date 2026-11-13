@@ -32,6 +32,12 @@
     },
     {
       "path": "../../libs/common"
+    },
+    {
+      "path": "../../libs/modules/redis/tsconfig.lib.json"
+    },
+    {
+      "path": "../../libs/modules/neo4j/tsconfig.lib.json"
     }
   ]
 }
