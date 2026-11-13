@@ -1,4 +1,3 @@
-
 import {
   Injectable,
   BadRequestException,
@@ -27,8 +26,7 @@ export class ReactiveLimitService {
       };
     } | null;
 
-    const errorCode =
-      databaseError?.driverError?.code ?? databaseError?.code;
+    const errorCode = databaseError?.driverError?.code ?? databaseError?.code;
 
     if (errorCode === '23P01') {
       throw new ConflictException(
@@ -64,9 +62,7 @@ export class ReactiveLimitService {
     }
 
     if (!unit.is_active) {
-      throw new BadRequestException(
-        'Organization unit is inactive',
-      );
+      throw new BadRequestException('Organization unit is inactive');
     }
 
     if (!/^\d+(?:\.\d+)?$/.test(data.limit_value)) {
@@ -85,13 +81,8 @@ export class ReactiveLimitService {
       throw new BadRequestException('Invalid limit dates');
     }
 
-    if (
-      data.valid_to !== null &&
-      data.valid_to <= data.valid_from
-    ) {
-      throw new BadRequestException(
-        'valid_to must be greater than valid_from',
-      );
+    if (data.valid_to !== null && data.valid_to <= data.valid_from) {
+      throw new BadRequestException('valid_to must be greater than valid_from');
     }
 
     const query = limitRepository
@@ -102,10 +93,9 @@ export class ReactiveLimitService {
       .andWhere('limit.limit_type = :limitType', {
         limitType: data.limit_type,
       })
-      .andWhere(
-        '(limit.valid_to IS NULL OR limit.valid_to > :newStart)',
-        { newStart: data.valid_from },
-      );
+      .andWhere('(limit.valid_to IS NULL OR limit.valid_to > :newStart)', {
+        newStart: data.valid_from,
+      });
 
     if (data.valid_to !== null) {
       query.andWhere('limit.valid_from < :newEnd', {
@@ -158,9 +148,7 @@ export class ReactiveLimitService {
       existingLimit.valid_to !== null &&
       existingLimit.valid_to.getTime() <= now.getTime()
     ) {
-      throw new ConflictException(
-        'Expired reactive limits cannot be updated',
-      );
+      throw new ConflictException('Expired reactive limits cannot be updated');
     }
 
     if (existingLimit.valid_from.getTime() > now.getTime()) {
@@ -209,9 +197,7 @@ export class ReactiveLimitService {
     return limit;
   }
 
-  async findByUnitId(
-    unitId: string,
-  ): Promise<ReactiveLimitEntity[]> {
+  async findByUnitId(unitId: string): Promise<ReactiveLimitEntity[]> {
     return await this.repository.find({
       where: {
         organization_unit_id: unitId,
@@ -222,9 +208,22 @@ export class ReactiveLimitService {
     });
   }
 
-  async findActiveByUnitId(
-    unitId: string,
-  ): Promise<ReactiveLimitEntity[]> {
+  /**
+   * Liste ekranı bütün limitleri tek seferde indirmez. Filtre veritabanında,
+   * sayfalama SQL seviyesinde uygulanır.
+   */
+  async getListByUnitId(unitId: string, page = 1, limit = 10) {
+    const [data, total] = await this.repository.findAndCount({
+      where: { organization_unit_id: unitId },
+      order: { valid_from: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { data, total };
+  }
+
+  async findActiveByUnitId(unitId: string): Promise<ReactiveLimitEntity[]> {
     const now = new Date();
 
     return await this.repository
@@ -233,10 +232,7 @@ export class ReactiveLimitService {
         unitId,
       })
       .andWhere('limit.valid_from <= :now', { now })
-      .andWhere(
-        '(limit.valid_to IS NULL OR limit.valid_to > :now)',
-        { now },
-      )
+      .andWhere('(limit.valid_to IS NULL OR limit.valid_to > :now)', { now })
       .orderBy('limit.valid_from', 'DESC')
       .getMany();
   }

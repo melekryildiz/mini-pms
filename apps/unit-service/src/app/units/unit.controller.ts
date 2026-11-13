@@ -38,10 +38,7 @@ export class UnitController extends BaseController<UnitEntity> {
 
   @Post()
   async createUnit(@Body() dto: CreateUnitDto) {
-    const unit = await this.unitOrchestrator.create(
-      dto,
-    ' system',
-  );
+    const unit = await this.unitOrchestrator.create(dto, ' system');
 
     return {
       success: true,
@@ -51,15 +48,8 @@ export class UnitController extends BaseController<UnitEntity> {
   }
 
   @Patch(':id')
-  async updateUnit(
-    @Param('id') id: string,
-    @Body() dto: UpdateUnitDto,
-  ) {
-    const unit = await this.unitOrchestrator.update(
-      id,
-      dto,
-      'system',
-    );
+  async updateUnit(@Param('id') id: string, @Body() dto: UpdateUnitDto) {
+    const unit = await this.unitOrchestrator.update(id, dto, 'system');
 
     return {
       success: true,
@@ -69,38 +59,32 @@ export class UnitController extends BaseController<UnitEntity> {
   }
 
   @Delete(':id')
-    async deleteUnit(@Param('id') id: string) {
+  async deleteUnit(@Param('id') id: string) {
+    await this.unitOrchestrator.softDelete(id, 'system');
 
-      await this.unitOrchestrator.softDelete(
-        id,
-        'system',
-      );
-
-      return {
-        success: true,
-        message: 'Record deleted successfully',
-      };
-    }
- @Get()
-    async listUnits(@Query() query: ListUnitsQueryDto) {
+    return {
+      success: true,
+      message: 'Record deleted successfully',
+    };
+  }
+  @Get()
+  async listUnits(@Query() query: ListUnitsQueryDto) {
     const filters: FindOptionsWhere<UnitEntity> = {};
 
     if (query.is_active !== undefined) {
-        filters.is_active = query.is_active;
+      filters.is_active = query.is_active === 'true';
     }
 
     if (query.organization_unit_type_id !== undefined) {
-        filters.organization_unit_type_id =
-        query.organization_unit_type_id;
+      filters.organization_unit_type_id = query.organization_unit_type_id;
     }
 
     return super.getList(
-        query.page,
-        query.limit,
-        query.sortBy,
-        query.sortOrder,
-        filters,
+      Number(query.page),
+      Number(query.limit),
+      query.sortBy,
+      query.sortOrder,
+      filters,
     );
   }
-
 }

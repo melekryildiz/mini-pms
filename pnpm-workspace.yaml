@@ -1,7 +1,16 @@
 packages:
+  # Çalıştırılabilir backend ve frontend uygulamaları.
   - 'apps/*'
+
+  # common ve contracts gibi birinci seviye kütüphaneler.
   - 'libs/*'
+
+  # Redis ve Neo4j gibi altyapı modülleri iki seviye aşağıda bulunuyor.
+  # Bu satır olmazsa pnpm onları bağımsız workspace paketi olarak görmeyebilir.
+  - 'libs/modules/*'
+
   - 'app/*'
+
 allowBuilds:
   nx: true
   '@parcel/watcher': true

@@ -27,3 +27,12 @@ infra/jsreport/data/
 
 # Local Postman workspace
 .postman/
+
+# TypeScript test/build çıktıları
+out-tsc/
+dist-sync-topology/
+
+apps/unit-service/out-tsc/
+apps/unit-service/dist-sync-topology/
+libs/common/out-tsc/
+libs/modules/*/out-tsc/

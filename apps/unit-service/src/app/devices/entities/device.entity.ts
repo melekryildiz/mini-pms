@@ -1,4 +1,3 @@
-
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -47,5 +46,5 @@ export class DeviceEntity {
   updated_at!: Date | null;
 
   @Column({ type: 'varchar', nullable: true })
-   updated_by!: string | null;
+  updated_by!: string | null;
 }

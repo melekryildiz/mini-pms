@@ -1,57 +1,60 @@
-import { Injectable,NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import type { DeepPartial } from 'typeorm';
 
-import {
-  BaseOrchestrator,
-  Transactional,
-} from '@mini-pms/common';
+import { BaseOrchestrator, Transactional } from '@mini-pms/common';
 
 import { DeviceService } from './device.service.js';
 import { DeviceLogEntity } from './entities/device-log.entity.js';
 
 import { DeviceEntity } from './entities/device.entity.js';
+import {
+  TopologyGraphService,
+} from '../topology/topology-graph.service.js';
 
 @Injectable()
 export class DeviceOrchestrator extends BaseOrchestrator {
-  constructor(entityManager: EntityManager, private readonly deviceService: DeviceService) {
+  constructor(
+    entityManager: EntityManager,
+    private readonly deviceService: DeviceService,
+    private readonly topologyGraphService: TopologyGraphService,
+  ) {
     super(entityManager);
   }
 
-  @Transactional()
-  async create(data: DeepPartial<DeviceEntity>,
-      created_by: string,
-      manager?: EntityManager): Promise<DeviceEntity> {
+  @Transactional({
+  afterCommit: 'syncDeviceAfterCommit',
+})
+  async create(
+    data: DeepPartial<DeviceEntity>,
+    created_by: string,
+    manager?: EntityManager,
+  ): Promise<DeviceEntity> {
+    if (!manager) {
+      throw new Error('Transaction manager is required');
+    }
+    // 1. Birimi oluştur
+    const device = await this.deviceService.create(data, created_by, manager);
 
-      if (!manager) {
-        throw new Error('Transaction manager is required');
-      }
-      // 1. Birimi oluştur
-      const device = await this.deviceService.create(
-        data,
-        created_by,
-        manager,
-      );
+    const logRepository = manager.getRepository(DeviceLogEntity);
 
-      const logRepository = manager.getRepository(
-            DeviceLogEntity,
-      );
+    // 3. CREATE logunu kaydet
+    await logRepository.save({
+      device_id: device.id,
+      action: 'CREATE',
+      changes: {
+        before: null,
+        after: { ...device },
+      },
+      created_by,
+    });
 
-      // 3. CREATE logunu kaydet
-      await logRepository.save({
-        device_id: device.id,
-        action: 'CREATE',
-        changes: {
-          before: null,
-          after: { ...device },
-        },
-        created_by,
-      });
-
-      return device;
+    return device;
   }
 
-  @Transactional()
+  @Transactional({
+    afterCommit: 'syncDeviceAfterCommit',
+  })
   async update(
     id: string,
     data: DeepPartial<DeviceEntity>,
@@ -101,7 +104,9 @@ export class DeviceOrchestrator extends BaseOrchestrator {
     return updatedDevice;
   }
 
-  @Transactional()
+  @Transactional({
+  afterCommit: 'deleteDeviceAfterCommit',
+})
   async softDelete(
     id: string,
     deleted_by: string,
@@ -129,11 +134,7 @@ export class DeviceOrchestrator extends BaseOrchestrator {
     const before = { ...device };
 
     // 3. DeviceService üzerinden soft delete yap
-    const result = await this.deviceService.softDelete(
-      id,
-      deleted_by,
-      manager,
-    );
+    const result = await this.deviceService.softDelete(id, deleted_by, manager);
 
     // 4. Silinmiş cihazın son hâlini getir
     const deletedDevice = await deviceRepository.findOne({
@@ -154,6 +155,30 @@ export class DeviceOrchestrator extends BaseOrchestrator {
 
     return result;
   }
+    /**
+   * Device create veya update transaction'ı commit edildikten sonra çağrılır.
+   *
+   * Create ve update metotları DeviceEntity döndürdüğü için aynı hook'u
+   * kullanabilir.
+   */
+  protected async syncDeviceAfterCommit(
+    device: DeviceEntity,
+  ): Promise<void> {
+    await this.topologyGraphService.upsertDevice(device);
+  }
+
+  /**
+   * Device soft delete transaction'ı commit edildikten sonra çağrılır.
+   */
+  protected async deleteDeviceAfterCommit(
+    deleted: boolean,
+    id: string,
+  ): Promise<void> {
+    if (!deleted) {
+      return;
+    }
+
+    await this.topologyGraphService.deleteDevice(id);
+  }
 
 }
-

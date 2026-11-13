@@ -14,7 +14,7 @@ module.exports = {
   plugins: [
     new IgnorePlugin({
   resourceRegExp:
-    /^(kafkajs|mqtt|nats|ioredis|@grpc\/grpc-js|@grpc\/proto-loader|@nestjs\/websockets\/socket-module|class-transformer\/storage)$/,
+    /^(kafkajs|mqtt|nats|@grpc\/grpc-js|@grpc\/proto-loader|@nestjs\/websockets\/socket-module|class-transformer\/storage)$/,
 }),
     new NxAppWebpackPlugin({
       target: 'node',

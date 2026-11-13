@@ -1,11 +1,20 @@
 import {
+  IsBoolean,
+  IsNotEmpty,
+  IsNumberString,
   IsOptional,
   IsString,
-  IsNotEmpty,
-  IsBoolean,
 } from 'class-validator';
 
 export class UpdateUnitDto {
+  /**
+   * Parent değişikliği gönderilmezse mevcut ilişki korunur.
+   * Null yalnızca root olabilen SUBSTATION için kabul edilir.
+   */
+  @IsOptional()
+  @IsNumberString()
+  parent_id?: string | null;
+
   @IsOptional()
   @IsString()
   @IsNotEmpty()

@@ -1,4 +1,3 @@
-
 import {
   IsString,
   IsNotEmpty,
@@ -7,10 +6,7 @@ import {
   Matches,
 } from 'class-validator';
 
-import {
-  ApiProperty,
-  ApiPropertyOptional,
-} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateDeviceDto {
   @ApiProperty({

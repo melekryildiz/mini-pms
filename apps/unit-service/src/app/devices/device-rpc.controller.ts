@@ -1,4 +1,3 @@
-
 import {
   Controller,
   HttpException,
@@ -6,11 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
-import {
-  MessagePattern,
-  Payload,
-  RpcException,
-} from '@nestjs/microservices';
+import { MessagePattern, Payload, RpcException } from '@nestjs/microservices';
 
 import { DeviceService } from './device.service.js';
 import { DeviceOrchestrator } from './device.orchestrator.js';
@@ -18,6 +13,7 @@ import { DeviceOrchestrator } from './device.orchestrator.js';
 import {
   CreateDeviceDto,
   UpdateDeviceDto,
+  ListDevicesQueryDto,
 } from '@mini-pms/contracts';
 
 @Controller()
@@ -41,9 +37,7 @@ export class DeviceRpcController {
    * Böylece API Gateway hatanın gerçek sebebini
    * öğrenebilir ve istemciye doğru HTTP kodunu dönebilir.
    */
-  private async handleRpc<T>(
-    operation: () => Promise<T>,
-  ): Promise<T> {
+  private async handleRpc<T>(operation: () => Promise<T>): Promise<T> {
     try {
       // İlgili servis işlemini çalıştırıyoruz.
       return await operation();
@@ -58,10 +52,7 @@ export class DeviceRpcController {
 
       // Beklenmeyen hataları sunucu loglarına yazıyoruz.
       // İç hata detaylarını istemciye göndermiyoruz.
-      console.error(
-        'Device RPC unexpected error:',
-        error,
-      );
+      console.error('Device RPC unexpected error:', error);
 
       throw new RpcException({
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
@@ -79,12 +70,22 @@ export class DeviceRpcController {
   @MessagePattern('device.findAll')
   findAll(
     @Payload()
-    query: { page?: number; limit?: number },
+    query: ListDevicesQueryDto,
   ) {
     return this.handleRpc(() =>
       this.deviceService.getList(
-        Number(query?.page ?? 1),
-        Number(query?.limit ?? 10),
+        Number(query?.page ?? '1'),
+        Number(query?.limit ?? '10'),
+        query.sortBy,
+        query.sortOrder,
+        {
+          ...(query.organization_unit_id && {
+            organization_unit_id: query.organization_unit_id,
+          }),
+          ...(query.is_active !== undefined && {
+            is_active: query.is_active === 'true',
+          }),
+        },
       ),
     );
   }
@@ -96,18 +97,12 @@ export class DeviceRpcController {
    * Cihaz bulunamazsa 404 hatası oluşturur.
    */
   @MessagePattern('device.findOne')
-  findOne(
-    @Payload() payload: { id: string },
-  ) {
+  findOne(@Payload() payload: { id: string }) {
     return this.handleRpc(async () => {
-      const device = await this.deviceService.findOne(
-        payload.id,
-      );
+      const device = await this.deviceService.findOne(payload.id);
 
       if (!device) {
-        throw new NotFoundException(
-          'Device not found',
-        );
+        throw new NotFoundException('Device not found');
       }
 
       return device;
@@ -128,15 +123,8 @@ export class DeviceRpcController {
    * İşlemler transaction kapsamında yürütülür.
    */
   @MessagePattern('device.create')
-  create(
-    @Payload() dto: CreateDeviceDto,
-  ) {
-    return this.handleRpc(() =>
-      this.deviceOrchestrator.create(
-        dto,
-        'system',
-      ),
-    );
+  create(@Payload() dto: CreateDeviceDto) {
+    return this.handleRpc(() => this.deviceOrchestrator.create(dto, 'system'));
   }
 
   /**
@@ -164,11 +152,7 @@ export class DeviceRpcController {
     },
   ) {
     return this.handleRpc(() =>
-      this.deviceOrchestrator.update(
-        payload.id,
-        payload.dto,
-        'system',
-      ),
+      this.deviceOrchestrator.update(payload.id, payload.dto, 'system'),
     );
   }
 
@@ -185,14 +169,9 @@ export class DeviceRpcController {
    * Audit log işlemi de orchestrator üzerinden yapılır.
    */
   @MessagePattern('device.delete')
-  delete(
-    @Payload() payload: { id: string },
-  ) {
+  delete(@Payload() payload: { id: string }) {
     return this.handleRpc(() =>
-      this.deviceOrchestrator.softDelete(
-        payload.id,
-        'system',
-      ),
+      this.deviceOrchestrator.softDelete(payload.id, 'system'),
     );
   }
 }

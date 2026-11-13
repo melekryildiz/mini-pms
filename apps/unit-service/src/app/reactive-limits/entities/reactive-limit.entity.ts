@@ -1,9 +1,4 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  Check,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, Check } from 'typeorm';
 
 @Entity({
   schema: 'mini_pms',

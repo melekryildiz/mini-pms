@@ -1,4 +1,3 @@
-
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -29,4 +28,3 @@ export class DeviceLogEntity {
   @Column({ type: 'varchar' })
   created_by!: string;
 }
-
