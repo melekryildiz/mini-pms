@@ -73,13 +73,6 @@ export class RedisService implements OnApplicationShutdown {
   /**
    * İleri seviye işlemler için aynı Redis client'ına kontrollü erişim sağlar.
    *
-   * Örneğin:
-   * - publish/subscribe
-   * - distributed lock
-   * - list queue
-   * - pipeline
-   *
-   * Buradan alınan client ile yeni bağlantı oluşturulmaz.
    */
   getClient(): Redis {
     return this.client;
@@ -87,11 +80,6 @@ export class RedisService implements OnApplicationShutdown {
 
   /**
    * NestJS uygulaması kontrollü biçimde kapanırken Redis bağlantısını kapatır.
-   *
-   * quit():
-   * - Bekleyen komutların tamamlanmasına fırsat verir.
-   * - Redis'e QUIT komutu gönderir.
-   * - TCP bağlantısını kontrollü kapatır.
    */
   async onApplicationShutdown(): Promise<void> {
     if (this.client.status === 'end') {

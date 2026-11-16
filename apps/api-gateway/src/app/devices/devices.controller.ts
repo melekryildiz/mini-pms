@@ -1,4 +1,3 @@
-
 import {
   Controller,
   Get,
@@ -8,7 +7,6 @@ import {
   Param,
   Body,
   Query,
-  ParseIntPipe,
 } from '@nestjs/common';
 
 import {
@@ -25,6 +23,7 @@ import {
 import {
   CreateDeviceDto,
   UpdateDeviceDto,
+  ListDevicesQueryDto,
 } from '@mini-pms/contracts';
 
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -32,19 +31,14 @@ import { DevicesService } from './devices.service';
 
 // Swagger'da endpoint'leri Devices başlığı altında gruplar.
 @ApiTags('Devices')
-
 // Manuel JWT Bearer token desteği.
 @ApiBearerAuth('access-token')
-
 // Keycloak OAuth2 Authorization Code + PKCE desteği.
 @ApiOAuth2(['openid'], 'keycloak-oauth2')
-
 // Bütün endpoint'ler /api/devices altında çalışır.
 @Controller('devices')
 export class DevicesController {
-  constructor(
-    private readonly devicesService: DevicesService,
-  ) {}
+  constructor(private readonly devicesService: DevicesService) {}
 
   /**
    * GET /api/devices
@@ -78,16 +72,8 @@ export class DevicesController {
     status: 403,
     description: 'Forbidden - Insufficient permissions',
   })
-  findAll(
-    @Query('page', new ParseIntPipe({ optional: true }))
-    page?: number,
-    @Query('limit', new ParseIntPipe({ optional: true }))
-    limit?: number,
-  ) {
-    return this.devicesService.findAll({
-      page: page ?? 1,
-      limit: limit ?? 10,
-    });
+  findAll(@Query() query: ListDevicesQueryDto) {
+    return this.devicesService.findAll(query);
   }
 
   /**
@@ -188,10 +174,7 @@ export class DevicesController {
     status: 404,
     description: 'Device not found',
   })
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateDeviceDto,
-  ) {
+  update(@Param('id') id: string, @Body() dto: UpdateDeviceDto) {
     return this.devicesService.update(id, dto);
   }
 

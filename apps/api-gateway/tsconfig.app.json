@@ -23,6 +23,9 @@
   ],
   "references": [
     {
+      "path": "../../libs/modules/redis/tsconfig.lib.json"
+    },
+    {
       "path": "../../libs/contracts"
     }
   ]

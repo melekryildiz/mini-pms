@@ -21,14 +21,36 @@ import { Query } from '@nestjs/common';
 
 import type { FindOptionsWhere } from 'typeorm';
 import { UnitOrchestrator } from './unit.orchestrator.js';
+import {
+  UnitTopologyService,
+} from '../topology/unit-topology.service.js';
 
 @Controller('units')
 export class UnitController extends BaseController<UnitEntity> {
   constructor(
     unitService: UnitService,
     private readonly unitOrchestrator: UnitOrchestrator,
+    private readonly unitTopologyService: UnitTopologyService,
   ) {
     super(unitService);
+  }
+
+  @Get(':id/tree')
+  async getUnitTree(
+    @Param('id') id: string,
+  ) {
+    return this.unitTopologyService.getUnitTree(
+      id,
+    );
+  }
+
+  @Get(':id/path')
+  async getUnitPath(
+    @Param('id') id: string,
+  ) {
+    return this.unitTopologyService.getUnitPath(
+      id,
+    );
   }
 
   @Get(':id')

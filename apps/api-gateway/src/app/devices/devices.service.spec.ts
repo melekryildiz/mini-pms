@@ -1,11 +1,11 @@
-
 import { Test, TestingModule } from '@nestjs/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { DevicesService } from './devices.service';
 
 import type {
   CreateDeviceDto,
+  ListDevicesQueryDto,
   UpdateDeviceDto,
 } from '@mini-pms/contracts';
 
@@ -20,41 +20,69 @@ describe('DevicesService', () => {
     jest.clearAllMocks();
     mockClient.send.mockReturnValue(of({ success: true }));
 
-    const module: TestingModule =
-      await Test.createTestingModule({
-        providers: [
-          DevicesService,
-          {
-            provide: 'UNIT_SERVICE',
-            useValue: mockClient,
-          },
-        ],
-      }).compile();
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        DevicesService,
+        {
+          provide: 'UNIT_SERVICE',
+          useValue: mockClient,
+        },
+      ],
+    }).compile();
 
     service = module.get<DevicesService>(DevicesService);
   });
 
   it('should send device.findAll pattern', async () => {
-    const query = {
-      page: 1,
-      limit: 10,
+    const query: ListDevicesQueryDto = {
+      page: '1',
+      limit: '10',
+      sortBy: 'id',
+      sortOrder: 'ASC',
     };
 
     await service.findAll(query);
 
-    expect(mockClient.send).toHaveBeenCalledWith(
-      'device.findAll',
-      query,
-    );
+    expect(mockClient.send).toHaveBeenCalledWith('device.findAll', query);
   });
 
   it('should send device.findOne pattern', async () => {
     await service.findOne('5');
 
-    expect(mockClient.send).toHaveBeenCalledWith(
-      'device.findOne',
-      { id: '5' },
+    expect(mockClient.send).toHaveBeenCalledWith('device.findOne', { id: '5' });
+  });
+
+  it('should preserve validation errors returned by the core service', async () => {
+    mockClient.send.mockReturnValue(
+      throwError(() => ({
+        statusCode: 400,
+        message: 'serial_no should not be empty',
+      })),
     );
+
+    await expect(service.create({} as CreateDeviceDto)).rejects.toMatchObject({
+      status: 400,
+    });
+  });
+
+  it('should preserve class-validator message arrays', async () => {
+    mockClient.send.mockReturnValue(
+      throwError(() => ({
+        statusCode: 400,
+        message: ['limit must be an integer between 1 and 100'],
+      })),
+    );
+
+    await expect(
+      service.findAll({
+        page: '1',
+        limit: '101',
+        sortBy: 'id',
+        sortOrder: 'ASC',
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+    });
   });
 
   it('should send device.create pattern', async () => {
@@ -66,10 +94,7 @@ describe('DevicesService', () => {
 
     await service.create(dto);
 
-    expect(mockClient.send).toHaveBeenCalledWith(
-      'device.create',
-      dto,
-    );
+    expect(mockClient.send).toHaveBeenCalledWith('device.create', dto);
   });
 
   it('should send device.update pattern', async () => {
@@ -79,18 +104,15 @@ describe('DevicesService', () => {
 
     await service.update('5', dto);
 
-    expect(mockClient.send).toHaveBeenCalledWith(
-      'device.update',
-      { id: '5', dto },
-    );
+    expect(mockClient.send).toHaveBeenCalledWith('device.update', {
+      id: '5',
+      dto,
+    });
   });
 
   it('should send device.delete pattern', async () => {
     await service.delete('5');
 
-    expect(mockClient.send).toHaveBeenCalledWith(
-      'device.delete',
-      { id: '5' },
-    );
+    expect(mockClient.send).toHaveBeenCalledWith('device.delete', { id: '5' });
   });
 });

@@ -398,9 +398,15 @@ importers:
       '@mini-pms/contracts':
         specifier: workspace:*
         version: link:../../libs/contracts
+      '@mini-pms/redis':
+        specifier: workspace:*
+        version: link:../../libs/modules/redis
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.2.7(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1)
+      '@nestjs/config':
+        specifier: ^4.0.2
+        version: 4.0.4(@nestjs/common@11.2.7(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(rxjs@7.8.1)
       '@nestjs/core':
         specifier: ^11.0.0
         version: 11.2.7(@nestjs/common@11.2.7(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)(supports-color@8.1.1))(@nestjs/microservices@11.2.8)(@nestjs/platform-express@11.2.7)(reflect-metadata@0.2.2)(rxjs@7.8.1)
@@ -612,6 +618,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@mini-pms/contracts':
+        specifier: workspace:*
+        version: link:../../libs/contracts
       next:
         specifier: ~16.1.6
         version: 16.1.7(@babel/core@7.29.7(supports-color@8.1.1))(@playwright/test@1.64.1)(babel-plugin-macros@3.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(sass@1.105.2)

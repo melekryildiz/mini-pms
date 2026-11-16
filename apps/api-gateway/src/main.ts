@@ -1,4 +1,3 @@
-
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
@@ -26,9 +25,7 @@ async function bootstrap() {
   const issuer = process.env.KEYCLOAK_ISSUER;
 
   if (!issuer) {
-    throw new Error(
-      'KEYCLOAK_ISSUER environment variable is required',
-    );
+    throw new Error('KEYCLOAK_ISSUER environment variable is required');
   }
 
   // Swagger API dokümantasyonu.
@@ -55,10 +52,8 @@ async function bootstrap() {
         description: 'Keycloak OAuth2 login with PKCE',
         flows: {
           authorizationCode: {
-            authorizationUrl:
-              `${issuer}/protocol/openid-connect/auth`,
-            tokenUrl:
-              `${issuer}/protocol/openid-connect/token`,
+            authorizationUrl: `${issuer}/protocol/openid-connect/auth`,
+            tokenUrl: `${issuer}/protocol/openid-connect/token`,
             scopes: {
               openid: 'OpenID Connect',
               profile: 'User profile',
@@ -85,27 +80,28 @@ async function bootstrap() {
 
   // Swagger UI.
   SwaggerModule.setup('api/docs', app, document, {
-  useGlobalPrefix: false,
-  customSwaggerUiPath: swaggerUiPath,
+    useGlobalPrefix: false,
+    customSwaggerUiPath: swaggerUiPath,
 
-  swaggerOptions: {
-    persistAuthorization: false,
+    swaggerOptions: {
+      persistAuthorization: false,
 
-    // Keycloak girişinden sonra Swagger'a dönülecek adres
-    oauth2RedirectUrl:
-      'http://localhost:3001/api/docs/oauth2-redirect.html',
+      // Keycloak girişinden sonra Swagger'a dönülecek adres
+      oauth2RedirectUrl: 'http://localhost:3001/api/docs/oauth2-redirect.html',
 
-    initOAuth: {
-      clientId: 'mini-pms-web',
-      appName: 'Mini PMS Swagger',
-      scopes: ['openid', 'profile', 'email'],
-      usePkceWithAuthorizationCodeGrant: true,
+      initOAuth: {
+        clientId: 'mini-pms-web',
+        appName: 'Mini PMS Swagger',
+        scopes: ['openid', 'profile', 'email'],
+        usePkceWithAuthorizationCodeGrant: true,
+      },
     },
-  },
-});
+  });
 
   // API Gateway portu.
-  const port = Number(process.env.PORT) || 3001;
+  // Servise özel değişken, monorepo içindeki başka bir uygulamanın PORT
+  // ayarının Gateway'i yanlışlıkla 3000'e taşımasını engeller.
+  const port = Number(process.env.API_GATEWAY_PORT ?? process.env.PORT ?? 3001);
 
   await app.listen(port);
 

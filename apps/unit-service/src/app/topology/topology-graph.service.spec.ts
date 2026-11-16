@@ -27,6 +27,10 @@ describe('TopologyGraphService', () => {
     work: Neo4jTransactionWork<void>,
   ) => Promise<void>>;
 
+  let executeRead: jest.MockedFunction<(
+    work: Neo4jTransactionWork<unknown>,
+  ) => Promise<unknown>>;
+
   let service: TopologyGraphService;
 
   beforeEach(() => {
@@ -41,9 +45,105 @@ describe('TopologyGraphService', () => {
         work(transaction),
     );
 
+    executeRead = jest.fn(
+      async (work: Neo4jTransactionWork<unknown>): Promise<unknown> =>
+        work(transaction),
+    );
+
     service = new TopologyGraphService({
       executeWrite,
+      executeRead,
     } as unknown as Neo4jService);
+  });
+
+  it('Unit subtree sorgusunu root dahil CONTAINS ilişkileri üzerinden okur', async () => {
+    transactionRun.mockResolvedValueOnce({
+      records: [
+        createNeo4jRecord({
+          id: '10',
+          parentId: null,
+          organizationUnitTypeId: '1',
+          code: 'SUB-10',
+          name: 'Substation 10',
+          isActive: true,
+          depth: 0,
+        }),
+        createNeo4jRecord({
+          id: '20',
+          parentId: '10',
+          organizationUnitTypeId: '2',
+          code: 'TR-20',
+          name: 'Transformer 20',
+          isActive: true,
+          depth: 1,
+        }),
+      ],
+    });
+
+    const result = await service.getUnitTree('10');
+
+    expect(executeRead).toHaveBeenCalledTimes(1);
+    expect(transactionRun).toHaveBeenCalledTimes(1);
+
+    const [query, parameters] = transactionRun.mock.calls[0];
+
+    expect(query).toContain('[:CONTAINS*0..]');
+    expect(query).toContain('length(path) AS depth');
+    expect(query).toContain('ORDER BY depth ASC, id ASC');
+    expect(parameters).toEqual({ unitId: '10' });
+    expect(result).toEqual([
+      {
+        id: '10',
+        parentId: null,
+        organizationUnitTypeId: '1',
+        code: 'SUB-10',
+        name: 'Substation 10',
+        isActive: true,
+      },
+      {
+        id: '20',
+        parentId: '10',
+        organizationUnitTypeId: '2',
+        code: 'TR-20',
+        name: 'Transformer 20',
+        isActive: true,
+      },
+    ]);
+  });
+
+  it('Unit path sorgusunu gerçek root noktasından hedefe doğru sıralar', async () => {
+    transactionRun.mockResolvedValueOnce({
+      records: [
+        createNeo4jRecord({
+          id: '10',
+          parentId: null,
+          organizationUnitTypeId: '1',
+          code: 'SUB-10',
+          name: 'Substation 10',
+          isActive: true,
+          position: 0,
+        }),
+        createNeo4jRecord({
+          id: '20',
+          parentId: '10',
+          organizationUnitTypeId: '2',
+          code: 'TR-20',
+          name: 'Transformer 20',
+          isActive: true,
+          position: 1,
+        }),
+      ],
+    });
+
+    const result = await service.getUnitPath('20');
+
+    const [query, parameters] = transactionRun.mock.calls[0];
+
+    expect(query).toContain('nodes(path) AS pathNodes');
+    expect(query).toContain('WHERE NOT EXISTS');
+    expect(query).toContain('ORDER BY position ASC');
+    expect(parameters).toEqual({ unitId: '20' });
+    expect(result.map((node) => node.id)).toEqual(['10', '20']);
   });
 
   it('topology grafını tek transaction içinde doğru sırayla yeniden kurar', async () => {
@@ -298,5 +398,14 @@ function createDevice(
     updated_at: null,
     updated_by: null,
     ...overrides,
+  };
+}
+
+/** Neo4j Record'un testlerde ihtiyaç duyduğumuz küçük taklidi. */
+function createNeo4jRecord(
+  data: Record<string, unknown>,
+) {
+  return {
+    toObject: () => data,
   };
 }

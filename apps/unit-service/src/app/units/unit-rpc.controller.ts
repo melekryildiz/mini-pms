@@ -10,7 +10,12 @@ import {
   CreateUnitDto,
   UpdateUnitDto,
   ListUnitsQueryDto,
+  SearchUnitsByCodeQueryDto,
 } from '@mini-pms/contracts';
+
+import {
+  UnitTopologyService,
+} from '../topology/unit-topology.service.js';
 
 @Controller()
 export class UnitRpcController {
@@ -19,6 +24,7 @@ export class UnitRpcController {
   constructor(
     private readonly unitService: UnitService,
     private readonly unitOrchestrator: UnitOrchestrator,
+    private readonly unitTopologyService: UnitTopologyService,
   ) {}
 
   // Ortak RPC işlem yönetimi
@@ -152,5 +158,100 @@ export class UnitRpcController {
         message: 'Record deleted successfully',
       };
     });
+  }
+  //  6. Unit ağacını getir
+  @MessagePattern('unit.getTree')
+  getUnitTree(
+    @Payload() payload: { id: string },
+  ) {
+    return this.handleRpc(
+      'unit.getTree',
+      () =>
+        this.unitTopologyService.getUnitTree(
+          payload.id,
+        ),
+    );
+  }
+  //7. Unit yolunu getir
+  @MessagePattern('unit.getPath')
+  getUnitPath(
+    @Payload() payload: { id: string },
+  ) {
+    return this.handleRpc(
+      'unit.getPath',
+      () =>
+        this.unitTopologyService.getUnitPath(
+          payload.id,
+        ),
+    );
+  }
+  /**
+ * Topoloji ekranının ilk açılışında yalnız root Unit'leri döndürür.
+ */
+  @MessagePattern('unit.getNavigationRoots')
+  getNavigationRoots() {
+    return this.handleRpc(
+      'unit.getNavigationRoots',
+      async () => {
+        const roots =
+          await this.unitService.getNavigationRoots();
+
+        return {
+          data: roots,
+        };
+      },
+    );
+  }
+
+  /**
+   * Kullanıcının açtığı düğümün yalnızca doğrudan çocuklarını döndürür..
+   */
+  @MessagePattern('unit.getNavigationChildren')
+  getNavigationChildren(
+    @Payload() payload: { parentId: string },
+  ) {
+    return this.handleRpc(
+      'unit.getNavigationChildren',
+      async () => {
+        const children =
+          await this.unitService.getNavigationChildren(
+            payload.parentId,
+          );
+
+        return {
+          parentId: payload.parentId,
+          data: children,
+        };
+      },
+    );
+  }
+
+  /**
+   * Unit kodunun tamamı veya bir bölümüyle arama yapar.
+
+   */
+  @MessagePattern('unit.searchNavigationByCode')
+  searchNavigationByCode(
+    @Payload() query: SearchUnitsByCodeQueryDto,
+  ) {
+    return this.handleRpc(
+      'unit.searchNavigationByCode',
+      async () => {
+
+        const limit = Number(query.limit);
+        const normalizedCode = query.code.trim();
+
+        const units =
+          await this.unitService.searchNavigationByCode(
+            normalizedCode,
+            limit,
+          );
+
+        return {
+          query: normalizedCode,
+          data: units,
+        };
+      },
+    );
   }
 }

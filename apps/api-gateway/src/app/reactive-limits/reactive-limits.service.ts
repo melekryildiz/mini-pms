@@ -1,4 +1,3 @@
-
 import {
   BadGatewayException,
   GatewayTimeoutException,
@@ -10,14 +9,11 @@ import {
 
 import { ClientProxy } from '@nestjs/microservices';
 
-import {
-  firstValueFrom,
-  TimeoutError,
-  timeout,
-} from 'rxjs';
+import { firstValueFrom, TimeoutError, timeout } from 'rxjs';
 
 import {
   CreateReactiveLimitDto,
+  ListReactiveLimitsQueryDto,
   UpdateReactiveLimitDto,
 } from '@mini-pms/contracts';
 
@@ -35,22 +31,15 @@ export class ReactiveLimitsService {
    * RabbitMQ'ya mesaj gönderir ve yanıtı bekler.
    * Timeout veya servis hatalarını HTTP hatalarına çevirir.
    */
-  private async request<T>(
-    pattern: string,
-    payload: unknown,
-  ): Promise<T> {
+  private async request<T>(pattern: string, payload: unknown): Promise<T> {
     try {
       return await firstValueFrom(
-        this.unitClient
-          .send<T>(pattern, payload)
-          .pipe(timeout(5000)),
+        this.unitClient.send<T>(pattern, payload).pipe(timeout(5000)),
       );
     } catch (error: unknown) {
       // Unit Service 5 saniye içinde cevap vermezse.
       if (error instanceof TimeoutError) {
-        throw new GatewayTimeoutException(
-          'Unit Service timeout',
-        );
+        throw new GatewayTimeoutException('Unit Service timeout');
       }
 
       // RPC üzerinden iletilen beklenen HTTP hataları.
@@ -77,7 +66,9 @@ export class ReactiveLimitsService {
         if (
           typeof rpcError.statusCode === 'number' &&
           allowedStatuses.includes(rpcError.statusCode) &&
-          typeof rpcError.message === 'string'
+          (typeof rpcError.message === 'string' ||
+            (Array.isArray(rpcError.message) &&
+              rpcError.message.every((item) => typeof item === 'string')))
         ) {
           throw new HttpException(
             {
@@ -90,14 +81,9 @@ export class ReactiveLimitsService {
       }
 
       // Beklenmeyen hataların ayrıntılarını dışarıya açmıyoruz.
-      console.error(
-        'Reactive Limit RPC unexpected error:',
-        error,
-      );
+      console.error('Reactive Limit RPC unexpected error:', error);
 
-      throw new BadGatewayException(
-        'Reactive Limit request failed',
-      );
+      throw new BadGatewayException('Reactive Limit request failed');
     }
   }
 
@@ -105,49 +91,38 @@ export class ReactiveLimitsService {
    * Yeni reaktif limit oluşturur.
    */
   create(dto: CreateReactiveLimitDto) {
-    return this.request(
-      'reactiveLimit.create',
-      dto,
-    );
+    return this.request('reactiveLimit.create', dto);
   }
 
   /**
    * Reaktif limit değerini günceller.
    */
   update(id: string, dto: UpdateReactiveLimitDto) {
-    return this.request(
-      'reactiveLimit.update',
-      { id, dto },
-    );
+    return this.request('reactiveLimit.update', { id, dto });
   }
 
   /**
    * Birime ait aktif limitleri getirir.
    */
   findActiveByUnitId(unitId: string) {
-    return this.request(
-      'reactiveLimit.findActiveByUnitId',
-      { unitId },
-    );
+    return this.request('reactiveLimit.findActiveByUnitId', { unitId });
   }
 
   /**
    * Birime ait bütün limit kayıtlarını getirir.
    */
   findByUnitId(unitId: string) {
-    return this.request(
-      'reactiveLimit.findByUnitId',
-      { unitId },
-    );
+    return this.request('reactiveLimit.findByUnitId', { unitId });
+  }
+
+  findAll(query: ListReactiveLimitsQueryDto) {
+    return this.request('reactiveLimit.findAll', query);
   }
 
   /**
    * Belirli bir reaktif limit kaydını getirir.
    */
   findById(id: string) {
-    return this.request(
-      'reactiveLimit.findById',
-      { id },
-    );
+    return this.request('reactiveLimit.findById', { id });
   }
 }

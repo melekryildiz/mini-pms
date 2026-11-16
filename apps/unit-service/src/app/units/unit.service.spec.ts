@@ -18,6 +18,10 @@ import type {
   OrganizationUnitLogEntity,
 } from './entities/organization-unit-log.js';
 
+import type {
+  UnitTopologyNode,
+} from '@mini-pms/contracts';
+
 /**
  * Bu test NestJS'in repository injection mekanizmasını değil UnitService'in
  * parent iş kurallarını ölçer. @nestjs/typeorm paketinin ESM girişini Jest
@@ -37,6 +41,12 @@ type MockUnitRepository = {
     (target: UnitEntity, source: Partial<UnitEntity>) => UnitEntity
   >;
   save: jest.MockedFunction<(unit: UnitEntity) => Promise<UnitEntity>>;
+  query: jest.MockedFunction<
+    (
+      query: string,
+      parameters?: unknown[],
+    ) => Promise<UnitTopologyNode[]>
+  >;
 };
 
 describe('UnitService parent update', () => {
@@ -52,6 +62,7 @@ describe('UnitService parent update', () => {
         return target;
       }),
       save: jest.fn(async (unit) => unit),
+      query: jest.fn(),
     };
 
     service = new UnitService(
@@ -267,6 +278,99 @@ describe('UnitService parent update', () => {
       name: 'Updated transformer',
     });
   });
+
+  it('Unit subtree için cycle korumalı recursive CTE çalıştırır', async () => {
+    const rows = [createTopologyNode({ id: '10' })];
+    repository.query.mockResolvedValue(rows);
+
+    const result = await service.getUnitTreeWithCte('10');
+
+    const [query, parameters] = repository.query.mock.calls[0];
+
+    expect(query).toContain('WITH RECURSIVE unit_tree');
+    expect(query).toContain('child.parent_id = parent_tree.id');
+    expect(query).toContain(
+      'child.id = ANY(parent_tree.visited_ids)',
+    );
+    expect(query).toContain('unit.is_deleted = false');
+    expect(parameters).toEqual(['10']);
+    expect(result).toBe(rows);
+  });
+
+  it('Unit path için parent yönünde recursive CTE çalıştırır', async () => {
+    const rows = [
+      createTopologyNode({ id: '10' }),
+      createTopologyNode({ id: '20', parentId: '10' }),
+    ];
+    repository.query.mockResolvedValue(rows);
+
+    const result = await service.getUnitPathWithCte('20');
+
+    const [query, parameters] = repository.query.mock.calls[0];
+
+    expect(query).toContain('WITH RECURSIVE unit_path');
+    expect(query).toContain('parent.id = child_path.parent_id');
+    expect(query).toContain('ORDER BY depth DESC');
+    expect(parameters).toEqual(['20']);
+    expect(result).toBe(rows);
+  });
+
+  it('lazy tree ilk açılışında yalnız root birimleri sorgular', async () => {
+    const rows = [
+      createNavigationNode({
+        id: '10',
+        parentId: null,
+        hasChildren: true,
+      }),
+    ];
+    repository.query.mockResolvedValue(rows);
+
+    const result = await service.getNavigationRoots();
+    const [query, parameters] = repository.query.mock.calls[0];
+
+    expect(query).toContain('unit.parent_id IS NULL');
+    expect(query).toContain('EXISTS (');
+    expect(query).toContain('AS "hasChildren"');
+    expect(query).not.toContain('WITH RECURSIVE');
+    expect(parameters).toBeUndefined();
+    expect(result).toBe(rows);
+  });
+
+  it('düğüm açıldığında yalnız doğrudan çocukları sorgular', async () => {
+    const rows = [
+      createNavigationNode({
+        id: '20',
+        parentId: '10',
+      }),
+    ];
+    repository.query.mockResolvedValue(rows);
+
+    const result = await service.getNavigationChildren('10');
+    const [query, parameters] = repository.query.mock.calls[0];
+
+    expect(query).toContain('unit.parent_id = $1');
+    expect(query).not.toContain('WITH RECURSIVE');
+    expect(parameters).toEqual(['10']);
+    expect(result).toBe(rows);
+  });
+
+  it('kod aramasını parametreli, limitli ve wildcard karakterleri escape edilmiş çalıştırır', async () => {
+    const rows = [createNavigationNode({ code: 'TR%_01' })];
+    repository.query.mockResolvedValue(rows);
+
+    const result = await service.searchNavigationByCode('  TR%_01  ', 20);
+    const [query, parameters] = repository.query.mock.calls[0];
+
+    expect(query).toContain('unit.code ILIKE $1');
+    expect(query).toContain('LIMIT $3');
+    expect(query).toContain('unit.is_deleted = false');
+    expect(parameters).toEqual([
+      '%TR\\%\\_01%',
+      'TR%_01',
+      20,
+    ]);
+    expect(result).toBe(rows);
+  });
 });
 
 function createUnit(
@@ -286,6 +390,35 @@ function createUnit(
     deleted_by: null,
     updated_at: null,
     updated_by: null,
+    ...overrides,
+  };
+}
+
+function createTopologyNode(
+  overrides: Partial<UnitTopologyNode> = {},
+): UnitTopologyNode {
+  return {
+    id: '10',
+    parentId: null,
+    organizationUnitTypeId: '1',
+    code: 'SUB-10',
+    name: 'Substation 10',
+    isActive: true,
+    ...overrides,
+  };
+}
+
+function createNavigationNode(
+  overrides: Partial<import('@mini-pms/contracts').UnitNavigationNode> = {},
+): import('@mini-pms/contracts').UnitNavigationNode {
+  return {
+    id: '10',
+    parentId: null,
+    organizationUnitTypeId: '1',
+    code: 'SUB-10',
+    name: 'Substation 10',
+    isActive: true,
+    hasChildren: false,
     ...overrides,
   };
 }
