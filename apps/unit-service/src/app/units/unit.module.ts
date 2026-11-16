@@ -14,6 +14,10 @@ import {
   TopologyModule,
 } from '../topology/topology.module.js';
 
+import {
+  UnitTopologyService,
+} from '../topology/unit-topology.service.js';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -28,7 +32,16 @@ import {
     TopologyModule,
   ],
   controllers: [UnitController, UnitRpcController],
-  providers: [UnitService, UnitOrchestrator],
+  providers: [
+    UnitService,
+    UnitOrchestrator,
+
+    /**
+     * UnitTopologyService hem bu modüldeki UnitService'i hem de import edilen
+     * TopologyModule'ün export ettiği TopologyGraphService'i kullanır.
+     */
+    UnitTopologyService,
+  ],
   exports: [UnitService],
 })
 export class UnitModule {}

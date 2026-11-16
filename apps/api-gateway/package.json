@@ -79,7 +79,9 @@
   },
   "dependencies": {
     "@mini-pms/contracts": "workspace:*",
+    "@mini-pms/redis": "workspace:*",
     "@nestjs/common": "^11.0.0",
+    "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.0",
     "@nestjs/microservices": "^11.2.8",
     "@nestjs/platform-express": "^11.0.0",

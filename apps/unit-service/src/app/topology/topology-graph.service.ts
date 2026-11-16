@@ -14,6 +14,14 @@ import type {
   DeviceEntity,
 } from '../devices/entities/device.entity.js';
 
+import type {
+  UnitTopologyNode,
+} from '@mini-pms/contracts';
+
+import {
+  mapNeo4jRecords,
+} from '@mini-pms/neo4j';
+
 /**
  * PostgreSQL'deki Unit ve Device kayıtlarını Neo4j topology projection'ına
  * yansıtır.
@@ -24,6 +32,116 @@ export class TopologyGraphService {
   constructor(
     private readonly neo4jService: Neo4jService,
   ) {}
+    /**
+   * Verilen Unit'i ve onun altındaki bütün Unit düğümlerini getirir.
+
+   */
+  async getUnitTree(
+    unitId: string,
+  ): Promise<UnitTopologyNode[]> {
+    return this.neo4jService.executeRead(
+      async (transaction) => {
+        const result = await transaction.run(
+          `
+
+            MATCH (root:Unit { id: $unitId })
+
+
+            MATCH path =
+              (root)-[:CONTAINS*0..]->(unit:Unit)
+
+
+            OPTIONAL MATCH
+              (parent:Unit)-[:CONTAINS]->(unit)
+
+            RETURN
+              unit.id AS id,
+              parent.id AS parentId,
+              unit.organizationUnitTypeId
+                AS organizationUnitTypeId,
+              unit.code AS code,
+              unit.name AS name,
+              unit.isActive AS isActive,
+              length(path) AS depth
+
+
+            ORDER BY depth ASC, id ASC
+          `,
+          {
+            unitId,
+          },
+        );
+
+        /**
+         * Neo4j Record nesnelerini API'nin kullandığı ortak tipe çeviriyoruz.
+         *
+         * mapNeo4jRecords ayrıca Neo4j Integer gibi özel değerleri normal
+         * JavaScript değerlerine dönüştürür.
+         */
+        return mapNeo4jRecords<UnitTopologyNode>(
+          result.records,
+          mapUnitTopologyNode,
+        );
+      },
+    );
+  }
+    /**
+   * Root Unit'ten verilen hedef Unit'e kadar olan yolu getirir.
+   */
+  async getUnitPath(
+    unitId: string,
+  ): Promise<UnitTopologyNode[]> {
+    return this.neo4jService.executeRead(
+      async (transaction) => {
+        const result = await transaction.run(
+          `
+
+            MATCH (target:Unit { id: $unitId })
+
+            MATCH path =
+              (root:Unit)-[:CONTAINS*0..]->(target)
+
+            WHERE NOT EXISTS {
+              MATCH (:Unit)-[:CONTAINS]->(root)
+            }
+
+            WITH nodes(path) AS pathNodes
+
+            UNWIND
+              range(0, size(pathNodes) - 1)
+              AS position
+
+            WITH
+              pathNodes[position] AS unit,
+              position
+
+            OPTIONAL MATCH
+              (parent:Unit)-[:CONTAINS]->(unit)
+
+            RETURN
+              unit.id AS id,
+              parent.id AS parentId,
+              unit.organizationUnitTypeId
+                AS organizationUnitTypeId,
+              unit.code AS code,
+              unit.name AS name,
+              unit.isActive AS isActive,
+              position
+
+            ORDER BY position ASC
+          `,
+          {
+            unitId,
+          },
+        );
+
+        return mapNeo4jRecords<UnitTopologyNode>(
+          result.records,
+          mapUnitTopologyNode,
+        );
+      },
+    );
+  }
     /**
    * PostgreSQL'den alınan güncel Unit ve Device kayıtlarıyla topology
    * projection'ını tamamen yeniden oluşturur.
@@ -314,4 +432,96 @@ export class TopologyGraphService {
       },
     );
   }
+}
+/**
+ * Neo4j Record mapper tarafından normalize edilmiş veriyi ortak topology
+ * tipine dönüştürür.
+ *
+ * Bu fonksiyon query'den dönen alanların gerçekten beklediğimiz tipte
+ * olduğunu runtime sırasında da kontrol eder.
+ */
+function mapUnitTopologyNode(
+  data: Readonly<Record<string, unknown>>,
+): UnitTopologyNode {
+  return {
+    id: readString(data, 'id'),
+
+    parentId: readNullableString(
+      data,
+      'parentId',
+    ),
+
+    organizationUnitTypeId: readString(
+      data,
+      'organizationUnitTypeId',
+    ),
+
+    code: readString(data, 'code'),
+
+    name: readString(data, 'name'),
+
+    isActive: readBoolean(
+      data,
+      'isActive',
+    ),
+  };
+}
+
+/**
+ * Zorunlu bir string alanını güvenli biçimde okur.
+ */
+function readString(
+  data: Readonly<Record<string, unknown>>,
+  field: string,
+): string {
+  const value = data[field];
+
+  if (typeof value !== 'string') {
+    throw new TypeError(
+      `Neo4j topology field "${field}" must be a string`,
+    );
+  }
+
+  return value;
+}
+
+/**
+ * parentId gibi null olabilen string alanını okur.
+ */
+function readNullableString(
+  data: Readonly<Record<string, unknown>>,
+  field: string,
+): string | null {
+  const value = data[field];
+
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== 'string') {
+    throw new TypeError(
+      `Neo4j topology field "${field}" must be a string or null`,
+    );
+  }
+
+  return value;
+}
+
+/**
+ * Boolean alanların yanlışlıkla "true" string'i veya 1 gibi farklı
+ * değerlerle response'a girmesini engeller.
+ */
+function readBoolean(
+  data: Readonly<Record<string, unknown>>,
+  field: string,
+): boolean {
+  const value = data[field];
+
+  if (typeof value !== 'boolean') {
+    throw new TypeError(
+      `Neo4j topology field "${field}" must be a boolean`,
+    );
+  }
+
+  return value;
 }

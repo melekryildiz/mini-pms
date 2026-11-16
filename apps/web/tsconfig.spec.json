@@ -29,6 +29,8 @@
     "src/**/*.spec.js",
     "src/**/*.test.jsx",
     "src/**/*.spec.jsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
     "src/**/*.d.ts",
     "specs/**/*.test.ts",
     "specs/**/*.spec.ts",
@@ -38,10 +40,5 @@
     "specs/**/*.spec.js",
     "specs/**/*.test.jsx",
     "specs/**/*.spec.jsx"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.json"
-    }
   ]
 }

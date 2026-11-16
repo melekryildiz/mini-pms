@@ -819,6 +819,51 @@
       ]
     },
     {
+      "clientId": "mini-pms-nextjs",
+      "name": "Mini PMS Next.js",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:3000/api/auth/callback/keycloak"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3000/login",
+        "logout.confirmation.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "frontchannel.logout.session.required": "true",
+        "pkce.code.challenge.method": "S256"
+      },
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "basic",
+        "email",
+        "mini-pms-api-scope"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "organization",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
       "id": "3bc7fbee-5dac-413d-97e4-08b56e9f3dc2",
       "clientId": "mini-pms-web",
       "name": "",
@@ -833,11 +878,11 @@
       "redirectUris": [
         "http://localhost:3001/api/oauth2-redirect.html",
         "http://localhost:3001/api/docs/oauth2-redirect.html",
-        "http://localhost:3002/*",
+        "http://localhost:3000/*",
         "https://oauth.pstmn.io/v1/callback"
       ],
       "webOrigins": [
-        "http://localhost:3002",
+        "http://localhost:3000",
         "http://localhost:3001"
       ],
       "notBefore": 0,
@@ -851,6 +896,7 @@
       "frontchannelLogout": true,
       "protocol": "openid-connect",
       "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3000/login",
         "logout.confirmation.enabled": "false",
         "realm_client": "false",
         "oidc.ciba.grant.enabled": "false",

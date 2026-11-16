@@ -1,4 +1,3 @@
-
 import {
   Body,
   Controller,
@@ -6,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 
 import {
@@ -21,6 +21,7 @@ import {
 import {
   CreateReactiveLimitDto,
   UpdateReactiveLimitDto,
+  ListReactiveLimitsQueryDto,
 } from '@mini-pms/contracts';
 
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -28,19 +29,22 @@ import { ReactiveLimitsService } from './reactive-limits.service.js';
 
 // Swagger'da endpoint'leri Reactive Limits altında gruplar.
 @ApiTags('Reactive Limits')
-
 // Manuel JWT Bearer token desteği.
 @ApiBearerAuth('access-token')
-
 // Keycloak OAuth2 Authorization Code + PKCE desteği.
 @ApiOAuth2(['openid'], 'keycloak-oauth2')
-
 // Bütün endpoint'ler /api/reactive-limits altında çalışır.
 @Controller('reactive-limits')
 export class ReactiveLimitsController {
-  constructor(
-    private readonly reactiveLimitsService: ReactiveLimitsService,
-  ) {}
+  constructor(private readonly reactiveLimitsService: ReactiveLimitsService) {}
+
+  /** Liste ekranı için birime göre filtrelenmiş, sayfalı sonuç. */
+  @Get()
+  @Roles('admin', 'operator', 'viewer')
+  @ApiOperation({ summary: 'List reactive limits' })
+  findAll(@Query() query: ListReactiveLimitsQueryDto) {
+    return this.reactiveLimitsService.findAll(query);
+  }
 
   /**
    * POST /api/reactive-limits
@@ -109,10 +113,7 @@ export class ReactiveLimitsController {
     status: 404,
     description: 'Reactive limit not found',
   })
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateReactiveLimitDto,
-  ) {
+  update(@Param('id') id: string, @Body() dto: UpdateReactiveLimitDto) {
     return this.reactiveLimitsService.update(id, dto);
   }
 
@@ -143,12 +144,8 @@ export class ReactiveLimitsController {
     status: 403,
     description: 'Insufficient permissions',
   })
-  findActiveByUnitId(
-    @Param('unitId') unitId: string,
-  ) {
-    return this.reactiveLimitsService.findActiveByUnitId(
-      unitId,
-    );
+  findActiveByUnitId(@Param('unitId') unitId: string) {
+    return this.reactiveLimitsService.findActiveByUnitId(unitId);
   }
 
   /**
@@ -178,12 +175,8 @@ export class ReactiveLimitsController {
     status: 403,
     description: 'Insufficient permissions',
   })
-  findByUnitId(
-    @Param('unitId') unitId: string,
-  ) {
-    return this.reactiveLimitsService.findByUnitId(
-      unitId,
-    );
+  findByUnitId(@Param('unitId') unitId: string) {
+    return this.reactiveLimitsService.findByUnitId(unitId);
   }
 
   /**

@@ -6,6 +6,7 @@
     "sourceRoot": "apps/web/src"
   },
   "dependencies": {
+    "@mini-pms/contracts": "workspace:*",
     "next": "~16.1.6",
     "next-auth": "5.0.0-beta.32",
     "react": "^19.0.0",

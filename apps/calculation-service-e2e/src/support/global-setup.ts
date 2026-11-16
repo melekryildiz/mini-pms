@@ -8,7 +8,9 @@ module.exports = async function () {
   console.log('\nSetting up...\n');
 
   const host = process.env.HOST ?? 'localhost';
-  const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+  const port = Number(
+    process.env.CALCULATION_SERVICE_PORT ?? process.env.PORT ?? 3005,
+  );
   await waitForPortOpen(port, { host });
 
   // Hint: Use `globalThis` to pass variables to global teardown.
