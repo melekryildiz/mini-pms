@@ -1,0 +1,47 @@
+{
+  "name": "simulator",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "verify": "node scripts/verify.cjs"
+  },
+  "nx": {
+    "targets": {
+      "serve": {
+        "continuous": true,
+        "executor": "@nx/js:node",
+        "defaultConfiguration": "development",
+        "dependsOn": [
+          "build"
+        ],
+        "options": {
+          "buildTarget": "simulator:build",
+          "runBuildTargetDependencies": false
+        },
+        "configurations": {
+          "development": {
+            "buildTarget": "simulator:build:development"
+          },
+          "production": {
+            "buildTarget": "simulator:build:production"
+          }
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@mini-pms/contracts": "workspace:*",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/microservices": "^11.2.8",
+    "amqp-connection-manager": "^5.0.1",
+    "amqplib": "^2.2.1",
+    "kafkajs": "^2.2.4",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.8"
+  }
+}

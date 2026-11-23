@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { requireUser } from '@/lib/auth/require-user';
-
+import { QueryProvider } from '@/components/providers/query-provider';
 export default async function ProtectedLayout({
   children,
 }: {
@@ -11,5 +11,11 @@ export default async function ProtectedLayout({
   // `(protected)` klasör adı URL'ye eklenmez; yalnızca dosya organizasyonudur.
   const user = await requireUser();
 
-  return <AppShell user={user}>{children}</AppShell>;
+ return (
+  <QueryProvider>
+    <AppShell user={user}>
+      {children}
+    </AppShell>
+  </QueryProvider>
+);
 }

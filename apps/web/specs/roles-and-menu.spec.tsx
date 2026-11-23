@@ -11,6 +11,7 @@ afterEach(cleanup);
 
 describe('role menus and operation permissions', () => {
   const menuLabels = [
+    'Anlık İzleme',
     'Genel Bakış',
     'Birimler',
     'Topoloji',

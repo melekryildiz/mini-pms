@@ -1,5 +1,16 @@
-import { Controller, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { MessagePattern, Payload, RpcException } from '@nestjs/microservices';
+import {
+  Controller,
+  HttpException,
+  HttpStatus,
+  Logger,
+  UseFilters,
+} from '@nestjs/common';
+import {
+  BaseRpcExceptionFilter,
+  MessagePattern,
+  Payload,
+  RpcException,
+} from '@nestjs/microservices';
 import type { FindOptionsWhere } from 'typeorm';
 
 import { UnitEntity } from './entities/unit.entity.js';
@@ -13,11 +24,12 @@ import {
   SearchUnitsByCodeQueryDto,
 } from '@mini-pms/contracts';
 
-import {
-  UnitTopologyService,
-} from '../topology/unit-topology.service.js';
+import { UnitTopologyService } from '../topology/unit-topology.service.js';
 
 @Controller()
+// pnpm peer bağımlılıkları birden fazla SDK kopyası oluşturabilir.
+// Hataları controller'ın RpcException sınıfıyla aynı SDK filtresi işler.
+@UseFilters(new BaseRpcExceptionFilter())
 export class UnitRpcController {
   private readonly logger = new Logger(UnitRpcController.name);
 
@@ -161,69 +173,47 @@ export class UnitRpcController {
   }
   //  6. Unit ağacını getir
   @MessagePattern('unit.getTree')
-  getUnitTree(
-    @Payload() payload: { id: string },
-  ) {
-    return this.handleRpc(
-      'unit.getTree',
-      () =>
-        this.unitTopologyService.getUnitTree(
-          payload.id,
-        ),
+  getUnitTree(@Payload() payload: { id: string }) {
+    return this.handleRpc('unit.getTree', () =>
+      this.unitTopologyService.getUnitTree(payload.id),
     );
   }
   //7. Unit yolunu getir
   @MessagePattern('unit.getPath')
-  getUnitPath(
-    @Payload() payload: { id: string },
-  ) {
-    return this.handleRpc(
-      'unit.getPath',
-      () =>
-        this.unitTopologyService.getUnitPath(
-          payload.id,
-        ),
+  getUnitPath(@Payload() payload: { id: string }) {
+    return this.handleRpc('unit.getPath', () =>
+      this.unitTopologyService.getUnitPath(payload.id),
     );
   }
   /**
- * Topoloji ekranının ilk açılışında yalnız root Unit'leri döndürür.
- */
+   * Topoloji ekranının ilk açılışında yalnız root Unit'leri döndürür.
+   */
   @MessagePattern('unit.getNavigationRoots')
   getNavigationRoots() {
-    return this.handleRpc(
-      'unit.getNavigationRoots',
-      async () => {
-        const roots =
-          await this.unitService.getNavigationRoots();
+    return this.handleRpc('unit.getNavigationRoots', async () => {
+      const roots = await this.unitService.getNavigationRoots();
 
-        return {
-          data: roots,
-        };
-      },
-    );
+      return {
+        data: roots,
+      };
+    });
   }
 
   /**
    * Kullanıcının açtığı düğümün yalnızca doğrudan çocuklarını döndürür..
    */
   @MessagePattern('unit.getNavigationChildren')
-  getNavigationChildren(
-    @Payload() payload: { parentId: string },
-  ) {
-    return this.handleRpc(
-      'unit.getNavigationChildren',
-      async () => {
-        const children =
-          await this.unitService.getNavigationChildren(
-            payload.parentId,
-          );
+  getNavigationChildren(@Payload() payload: { parentId: string }) {
+    return this.handleRpc('unit.getNavigationChildren', async () => {
+      const children = await this.unitService.getNavigationChildren(
+        payload.parentId,
+      );
 
-        return {
-          parentId: payload.parentId,
-          data: children,
-        };
-      },
-    );
+      return {
+        parentId: payload.parentId,
+        data: children,
+      };
+    });
   }
 
   /**
@@ -231,27 +221,30 @@ export class UnitRpcController {
 
    */
   @MessagePattern('unit.searchNavigationByCode')
-  searchNavigationByCode(
-    @Payload() query: SearchUnitsByCodeQueryDto,
-  ) {
-    return this.handleRpc(
-      'unit.searchNavigationByCode',
-      async () => {
+  searchNavigationByCode(@Payload() query: SearchUnitsByCodeQueryDto) {
+    return this.handleRpc('unit.searchNavigationByCode', async () => {
+      const limit = Number(query.limit);
+      const normalizedCode = query.code.trim();
 
-        const limit = Number(query.limit);
-        const normalizedCode = query.code.trim();
+      const units = await this.unitService.searchNavigationByCode(
+        normalizedCode,
+        limit,
+      );
 
-        const units =
-          await this.unitService.searchNavigationByCode(
-            normalizedCode,
-            limit,
-          );
-
-        return {
-          query: normalizedCode,
-          data: units,
-        };
-      },
+      return {
+        query: normalizedCode,
+        data: units,
+      };
+    });
+  }
+  /**
+   * Ingestion'ın anlık değer akışı için sayaç listesini verir.
+   * HTTP endpoint değil, RabbitMQ RPC handler'ıdır.
+   */
+  @MessagePattern('unit.getSubtreeMeters')
+  async getSubtreeMeters(@Payload() payload: { unitId: string }) {
+    return this.handleRpc('unit.getSubtreeMeters', () =>
+      this.unitTopologyService.getUnitSubtreeMeters(payload?.unitId),
     );
   }
 }

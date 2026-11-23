@@ -1,9 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import {
-  RedisModule,
-  type RedisModuleOptions,
-} from '@mini-pms/redis';
+import { RedisModule, type RedisModuleOptions } from '@mini-pms/redis';
 
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { APP_GUARD } from '@nestjs/core';
@@ -39,27 +36,19 @@ import {
  * Eksik veya yanlış provider bağlanırsa uygulama sessizce yanlış ayarla
  * çalışmak yerine başlangıçta anlaşılır bir hata verir.
  */
-function readGatewayCacheConfig(
-  dependency: unknown,
-): GatewayCacheConfig {
+function readGatewayCacheConfig(dependency: unknown): GatewayCacheConfig {
   if (!(dependency instanceof ConfigService)) {
-    throw new Error(
-      'Gateway Redis factory requires ConfigService',
-    );
+    throw new Error('Gateway Redis factory requires ConfigService');
   }
 
-  return dependency.getOrThrow<GatewayCacheConfig>(
-    CACHE_CONFIG_KEY,
-  );
+  return dependency.getOrThrow<GatewayCacheConfig>(CACHE_CONFIG_KEY);
 }
 
 /**
  * Ortak RedisModule'ün anlayacağı bağlantı seçeneklerini üretir.
  * RedisModule bu seçeneklerle Gateway process'i başına tek client oluşturur.
  */
-function createRedisOptions(
-  dependency: unknown,
-): RedisModuleOptions {
+function createRedisOptions(dependency: unknown): RedisModuleOptions {
   const cacheConfig = readGatewayCacheConfig(dependency);
 
   return {
@@ -94,8 +83,7 @@ function createRedisOptions(
       useFactory: createRedisOptions,
     }),
 
-    // Unit Service ile RabbitMQ üzerinden haberleşmek
-    // için tek bir ClientProxy oluşturuyoruz.
+    // Her hedef kuyruğu için ayrı RPC client; hata/timeout yönetimi ortaktır.
     ClientsModule.register([
       {
         // Service'lerde @Inject('UNIT_SERVICE') ile kullanılır.
@@ -119,6 +107,18 @@ function createRedisOptions(
           queueOptions: {
             durable: true,
           },
+        },
+      },
+      {
+        name: 'INGESTION_SERVICE',
+        transport: Transport.RMQ,
+        options: {
+          urls: [
+            process.env.RABBITMQ_URL ??
+              'amqp://mpms:mpms_dev_password@localhost:5672',
+          ],
+          queue: 'mpms.instant',
+          queueOptions: { durable: true },
         },
       },
     ]),

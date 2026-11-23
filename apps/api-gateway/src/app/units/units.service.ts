@@ -21,6 +21,7 @@ import {
   type GetUnitRootsResponse,
   type GetUnitChildrenResponse,
   type SearchUnitsByCodeResponse,
+  type GetUnitInstantValuesResponse,
 } from '@mini-pms/contracts';
 import { UnitCacheService } from './unit-cache.service';
 
@@ -33,17 +34,24 @@ export class UnitsService {
     @Inject('UNIT_SERVICE')
     private readonly unitClient: ClientProxy,
     private readonly unitCacheService: UnitCacheService,
+    @Inject('INGESTION_SERVICE')
+    private readonly instantClient: ClientProxy,
   ) {}
 
-  private async request<T>(pattern: string, payload: unknown): Promise<T> {
+  private async request<T>(
+    pattern: string,
+    payload: unknown,
+    client: ClientProxy = this.unitClient,
+    timeoutMs = 5_000,
+  ): Promise<T> {
     try {
       return await firstValueFrom(
-        this.unitClient.send<T>(pattern, payload).pipe(timeout(5000)),
+        client.send<T>(pattern, payload).pipe(timeout(timeoutMs)),
       );
     } catch (error) {
       if (error instanceof TimeoutError) {
         throw new GatewayTimeoutException(
-          'Unit Service did not respond in time',
+          'İlgili servis zamanında yanıt vermedi.',
         );
       }
 
@@ -56,7 +64,7 @@ export class UnitsService {
         'message' in error
       ) {
         const rpcError = error as { statusCode: unknown; message: unknown };
-        const allowed = [400, 401, 403, 404, 409, 422, 503];
+        const allowed = [400, 401, 403, 404, 409, 422, 503, 504];
 
         if (
           typeof rpcError.statusCode === 'number' &&
@@ -72,27 +80,22 @@ export class UnitsService {
         }
       }
 
-      console.error('UNIT SERVICE RPC ERROR:', error);
+      console.error('SERVICE RPC ERROR:', error);
 
-      throw new BadGatewayException('Unit Service request failed');
+      throw new BadGatewayException('Servis isteği tamamlanamadı.');
     }
   }
 
-  async findOne(id: string) : Promise<UnitDetail | null> {
-      const cachedUnit =
-      await this.unitCacheService.get<UnitDetail>(id);
+  async findOne(id: string): Promise<UnitDetail | null> {
+    const cachedUnit = await this.unitCacheService.get<UnitDetail>(id);
 
-      if (cachedUnit !== null) {
-        //Cache hit:
-        return cachedUnit;
-      }
+    if (cachedUnit !== null) {
+      //Cache hit:
+      return cachedUnit;
+    }
 
     //Cache miss:
-    const unit = await this.request<UnitDetail | null>(
-      'unit.findOne',
-      { id },
-    );
-
+    const unit = await this.request<UnitDetail | null>('unit.findOne', { id });
 
     if (unit !== null) {
       await this.unitCacheService.set(id, unit);
@@ -103,6 +106,16 @@ export class UnitsService {
 
   findAll(query: ListUnitsQueryDto) {
     return this.request('unit.findAll', query);
+  }
+
+  getUnitInstantValues(unitId: string): Promise<GetUnitInstantValuesResponse> {
+    // Birim detay cache'ini kullanma; Ingestion son ölçümleri Redis'ten okur.
+    return this.request<GetUnitInstantValuesResponse>(
+      'get-unit-instant-values',
+      { unitId },
+      this.instantClient,
+      7_000,
+    );
   }
 
   history(id: string, page = 1, limit = 20) {
@@ -118,20 +131,17 @@ export class UnitsService {
   }
 
   async update(id: string, dto: UpdateUnitDto, username: string) {
-      /**
+    /**
      * Önce gerçek veri kaynağını güncelliyoruz.
      *
      * Cache'i önce silseydik RPC başarısız olduğunda geçerli cache kaydını
      * gereksiz yere kaybetmiş olurduk.
      */
-    const updatedUnit = await this.request(
-      'unit.update',
-      {
-        id,
-        dto,
-        username,
-      },
-    );
+    const updatedUnit = await this.request('unit.update', {
+      id,
+      dto,
+      username,
+    });
 
     /**
      * Bu satıra yalnız RPC başarılı olursa ulaşılır.
@@ -144,20 +154,14 @@ export class UnitsService {
     return updatedUnit;
   }
 
-    /**
+  /**
    * Birim silindikten sonra cache'teki eski detayın dönmesini engeller.
    */
-  async delete(
-    id: string,
-    username: string,
-  ) {
-    const result = await this.request(
-      'unit.delete',
-      {
-        id,
-        username,
-      },
-    );
+  async delete(id: string, username: string) {
+    const result = await this.request('unit.delete', {
+      id,
+      username,
+    });
 
     /**
      * Soft-delete olsa bile normal detay endpointinin eski aktif nesneyi
@@ -168,48 +172,30 @@ export class UnitsService {
     return result;
   }
 
-  getTree(
-    id: string,
-  ): Promise<GetUnitTreeResponse> {
-    return this.request<GetUnitTreeResponse>(
-      'unit.getTree',
-      {
-        id,
-      },
-    );
+  getTree(id: string): Promise<GetUnitTreeResponse> {
+    return this.request<GetUnitTreeResponse>('unit.getTree', {
+      id,
+    });
   }
-  getPath(
-    id: string,
-  ): Promise<GetUnitPathResponse> {
-    return this.request<GetUnitPathResponse>(
-      'unit.getPath',
-      {
-        id,
-      },
-    );
+  getPath(id: string): Promise<GetUnitPathResponse> {
+    return this.request<GetUnitPathResponse>('unit.getPath', {
+      id,
+    });
   }
-    /**
+  /**
    * Topoloji ekranının ilk açılışında yalnız root Unit'leri ister.
    */
   getNavigationRoots(): Promise<GetUnitRootsResponse> {
-    return this.request<GetUnitRootsResponse>(
-      'unit.getNavigationRoots',
-      {},
-    );
+    return this.request<GetUnitRootsResponse>('unit.getNavigationRoots', {});
   }
 
   /**
    * Kullanıcının açtığı Unit'in yalnızca doğrudan çocuklarını ister.
    */
-  getNavigationChildren(
-    parentId: string,
-  ): Promise<GetUnitChildrenResponse> {
-    return this.request<GetUnitChildrenResponse>(
-      'unit.getNavigationChildren',
-      {
-        parentId,
-      },
-    );
+  getNavigationChildren(parentId: string): Promise<GetUnitChildrenResponse> {
+    return this.request<GetUnitChildrenResponse>('unit.getNavigationChildren', {
+      parentId,
+    });
   }
 
   /**

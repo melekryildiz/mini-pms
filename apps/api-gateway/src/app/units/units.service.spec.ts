@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { UnitsService } from './units.service';
 import { UnitCacheService } from './unit-cache.service';
 
@@ -15,6 +15,7 @@ describe('UnitsService', () => {
   const mockClient = {
     send: jest.fn(),
   };
+  const mockInstantClient = { send: jest.fn() };
 
   const mockUnitCache = {
     get: jest.fn(),
@@ -26,6 +27,7 @@ describe('UnitsService', () => {
     jest.clearAllMocks();
 
     mockClient.send.mockReturnValue(of({ success: true }));
+    mockInstantClient.send.mockReturnValue(of({ unitId: '1', meters: [] }));
     mockUnitCache.get.mockResolvedValue(null);
     mockUnitCache.set.mockResolvedValue(undefined);
     mockUnitCache.invalidate.mockResolvedValue(undefined);
@@ -41,10 +43,56 @@ describe('UnitsService', () => {
           provide: UnitCacheService,
           useValue: mockUnitCache,
         },
+        { provide: 'INGESTION_SERVICE', useValue: mockInstantClient },
       ],
     }).compile();
 
     service = module.get<UnitsService>(UnitsService);
+  });
+
+  it('anlık değer için yalnız Ingestion clientını kullanır; cache okumaz', async () => {
+    const response = {
+      unitId: '10',
+      generatedAt: '2026-11-23T10:00:00.000Z',
+      meters: [],
+    };
+    mockInstantClient.send.mockReturnValueOnce(of(response));
+    await expect(service.getUnitInstantValues('10')).resolves.toBe(response);
+    expect(mockInstantClient.send).toHaveBeenCalledWith(
+      'get-unit-instant-values',
+      { unitId: '10' },
+    );
+    expect(mockClient.send).not.toHaveBeenCalled();
+    expect(mockUnitCache.get).not.toHaveBeenCalled();
+    expect(mockUnitCache.set).not.toHaveBeenCalled();
+  });
+
+  it('Unit isteklerini varsayılan Unit clientına göndermeye devam eder', async () => {
+    await service.findAll({ page: '1', limit: '10' });
+    expect(mockClient.send).toHaveBeenCalled();
+    expect(mockInstantClient.send).not.toHaveBeenCalled();
+  });
+
+  it('Ingestiondan gelen 504 hata kodunu korur', async () => {
+    mockInstantClient.send.mockReturnValueOnce(
+      throwError(() => ({ statusCode: 504, message: 'Unit timeout' })),
+    );
+    await expect(service.getUnitInstantValues('10')).rejects.toMatchObject({
+      status: 504,
+    });
+  });
+
+  it('anlık değer çağrısında 7 saniye timeout uygular', async () => {
+    jest.useFakeTimers();
+    try {
+      mockInstantClient.send.mockReturnValueOnce(NEVER);
+      const result = service.getUnitInstantValues('10');
+      const assertion = expect(result).rejects.toMatchObject({ status: 504 });
+      await jest.advanceTimersByTimeAsync(7_000);
+      await assertion;
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('should send unit.findAll pattern', async () => {
@@ -125,19 +173,15 @@ describe('UnitsService', () => {
   it('lazy tree açılışında root patternini boş payload ile gönderir', async () => {
     await service.getNavigationRoots();
 
-    expect(mockClient.send).toHaveBeenCalledWith(
-      'unit.getNavigationRoots',
-      {},
-    );
+    expect(mockClient.send).toHaveBeenCalledWith('unit.getNavigationRoots', {});
   });
 
   it('açılan düğümün parentId değerini children patternine gönderir', async () => {
     await service.getNavigationChildren('10');
 
-    expect(mockClient.send).toHaveBeenCalledWith(
-      'unit.getNavigationChildren',
-      { parentId: '10' },
-    );
+    expect(mockClient.send).toHaveBeenCalledWith('unit.getNavigationChildren', {
+      parentId: '10',
+    });
   });
 
   it('kod arama DTO değerlerini search patternine değiştirmeden gönderir', async () => {
@@ -155,8 +199,7 @@ describe('UnitsService', () => {
     mockClient.send.mockReturnValue(
       throwError(() => ({
         statusCode: 503,
-        message:
-          'Neo4j and PostgreSQL topology results do not match',
+        message: 'Neo4j and PostgreSQL topology results do not match',
       })),
     );
 

@@ -44,6 +44,17 @@ type JwtUser = {
 export class UnitsController {
   constructor(private readonly unitsService: UnitsService) {}
 
+  @Get(':id/instant-values')
+  @Roles('admin', 'operator', 'viewer')
+  @ApiOperation({
+    summary: 'Birimin alt ağacındaki sayaçların son ölçümlerini getir',
+  })
+  @ApiParam({ name: 'id', description: 'Seçilen birimin kimliği' })
+  @ApiResponse({ status: 200, description: 'Sayaçlar ve son ölçümleri' })
+  getUnitInstantValues(@Param('id') id: string) {
+    return this.unitsService.getUnitInstantValues(id);
+  }
+
   /**
    * GET /api/units
    * Admin, operator ve viewer erişebilir.
@@ -66,7 +77,7 @@ export class UnitsController {
   findAll(@Query() query: ListUnitsQueryDto) {
     return this.unitsService.findAll(query);
   }
-    /**
+  /**
    * GET /api/units/navigation/roots
    */
   @Get('navigation/roots')
@@ -106,9 +117,7 @@ export class UnitsController {
     status: 400,
     description: 'Invalid search query',
   })
-  searchNavigationByCode(
-    @Query() query: SearchUnitsByCodeQueryDto,
-  ) {
+  searchNavigationByCode(@Query() query: SearchUnitsByCodeQueryDto) {
     return this.unitsService.searchNavigationByCode(query);
   }
 
@@ -131,57 +140,46 @@ export class UnitsController {
     status: 200,
     description: 'Direct child units returned',
   })
-  getNavigationChildren(
-    @Param('id') id: string,
-  ) {
+  getNavigationChildren(@Param('id') id: string) {
     return this.unitsService.getNavigationChildren(id);
   }
-    /**
+  /**
    * Verilen Unit'i ve bütün alt birimlerini recursive tree olarak döndürür.
    */
   @Get(':id/tree')
   @Roles('admin', 'operator', 'viewer')
   @ApiOperation({
-    summary:
-      'Get unit subtree and compare Neo4j/PostgreSQL query performance',
+    summary: 'Get unit subtree and compare Neo4j/PostgreSQL query performance',
   })
   @ApiParam({
     name: 'id',
     type: String,
-    description:
-      'Root organization unit ID',
+    description: 'Root organization unit ID',
   })
   @ApiResponse({
     status: 200,
-    description:
-      'Unit tree and query comparison returned',
+    description: 'Unit tree and query comparison returned',
   })
   @ApiResponse({
     status: 401,
-    description:
-      'Unauthorized - Missing or invalid JWT',
+    description: 'Unauthorized - Missing or invalid JWT',
   })
   @ApiResponse({
     status: 403,
-    description:
-      'Forbidden - Insufficient permissions',
+    description: 'Forbidden - Insufficient permissions',
   })
   @ApiResponse({
     status: 404,
-    description:
-      'Unit not found',
+    description: 'Unit not found',
   })
   @ApiResponse({
     status: 503,
-    description:
-      'Neo4j and PostgreSQL topology results do not match',
+    description: 'Neo4j and PostgreSQL topology results do not match',
   })
-  getTree(
-    @Param('id') id: string,
-  ) {
+  getTree(@Param('id') id: string) {
     return this.unitsService.getTree(id);
   }
-    /**
+  /**
    * Gerçek root Unit'ten hedef Unit'e kadar olan yolu döndürür
    */
   @Get(':id/path')
@@ -193,37 +191,29 @@ export class UnitsController {
   @ApiParam({
     name: 'id',
     type: String,
-    description:
-      'Target organization unit ID',
+    description: 'Target organization unit ID',
   })
   @ApiResponse({
     status: 200,
-    description:
-      'Unit path and query comparison returned',
+    description: 'Unit path and query comparison returned',
   })
   @ApiResponse({
     status: 401,
-    description:
-      'Unauthorized - Missing or invalid JWT',
+    description: 'Unauthorized - Missing or invalid JWT',
   })
   @ApiResponse({
     status: 403,
-    description:
-      'Forbidden - Insufficient permissions',
+    description: 'Forbidden - Insufficient permissions',
   })
   @ApiResponse({
     status: 404,
-    description:
-      'Unit not found',
+    description: 'Unit not found',
   })
   @ApiResponse({
     status: 503,
-    description:
-      'Neo4j and PostgreSQL topology results do not match',
+    description: 'Neo4j and PostgreSQL topology results do not match',
   })
-  getPath(
-    @Param('id') id: string,
-  ) {
+  getPath(@Param('id') id: string) {
     return this.unitsService.getPath(id);
   }
   /**

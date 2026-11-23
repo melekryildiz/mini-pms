@@ -3,10 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { ClientProxy } from '@nestjs/microservices';
 import { of } from 'rxjs';
 
-import {
-  RedisModule,
-  RedisService,
-} from '@mini-pms/redis';
+import { RedisModule, RedisService } from '@mini-pms/redis';
 
 import type { GatewayCacheConfig } from '../config/cache.config';
 import { UnitCacheService } from './unit-cache.service';
@@ -66,6 +63,7 @@ describeRedisIntegration('Unit detail cache Redis integration', () => {
     unitsService = new UnitsService(
       client as unknown as ClientProxy,
       cacheService,
+      { send: jest.fn() } as unknown as ClientProxy,
     );
 
     // Önceki yarım kalmış bir test aynı process/id kombinasyonunu bırakmışsa
@@ -129,11 +127,7 @@ describeRedisIntegration('Unit detail cache Redis integration', () => {
       return of({ success: true });
     });
 
-    await unitsService.update(
-      unitId,
-      { name: updatedUnit.name },
-      'f2t5-test',
-    );
+    await unitsService.update(unitId, { name: updatedUnit.name }, 'f2t5-test');
 
     const detailAfterUpdate = await unitsService.findOne(unitId);
 

@@ -16,6 +16,12 @@ module.exports = {
   transform: {
     '^.+\\.[tj]s$': ['@swc/jest', swcJestConfig],
   },
+  // TypeORM'un ESM paketlerini de SWC ile Jest'in okuyacağı biçime çevir.
+  // pnpm gerçek dosyaları .pnpm dizini altında tutar.
+  transformIgnorePatterns: [
+    'node_modules/.pnpm/(?!(?:@nestjs\\+typeorm|typeorm)@)',
+    'node_modules/(?!\\.pnpm/|@nestjs/typeorm/|typeorm/)',
+  ],
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: 'test-output/jest/coverage',
 };

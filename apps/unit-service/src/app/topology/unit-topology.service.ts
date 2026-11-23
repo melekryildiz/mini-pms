@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
+  BadRequestException,
 } from '@nestjs/common';
 
 import { performance } from 'node:perf_hooks';
@@ -12,6 +13,7 @@ import type {
   TopologyQueryComparison,
   UnitTopologyNode,
   UnitTreeNode,
+  UnitSubtreeMeter,
 } from '@mini-pms/contracts';
 
 import { UnitService } from '../units/unit.service.js';
@@ -121,6 +123,31 @@ export class UnitTopologyService {
       ),
     };
   }
+  async getUnitSubtreeMeters(
+  unitId: string,
+): Promise<UnitSubtreeMeter[]> {
+  // RPC payload'u çalışma zamanında hatalı olabilir.
+  if (
+    typeof unitId !== 'string' ||
+    !/^[1-9]\d{0,18}$/.test(unitId) ||
+    BigInt(unitId) > 9_223_372_036_854_775_807n
+  ) {
+    throw new BadRequestException('Geçersiz birim kimliği.');
+  }
+
+  // Ana kayıt PostgreSQL'de; silinmiş birim findOne'dan dönmez.
+  const unit = await this.unitService.findOne(unitId);
+
+  if (!unit) {
+    throw new NotFoundException('Birim bulunamadı.');
+  }
+
+  if (!unit.is_active) {
+    throw new BadRequestException('Birim aktif değil.');
+  }
+
+  return this.topologyGraphService.getUnitSubtreeMeters(unitId);
+}
 }
 
 /**

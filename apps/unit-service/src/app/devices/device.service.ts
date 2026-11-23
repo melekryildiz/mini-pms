@@ -15,6 +15,7 @@ import { BaseService } from '@mini-pms/common';
 
 import { DeviceEntity } from './entities/device.entity.js';
 import { UnitEntity } from '../units/entities/unit.entity.js';
+import type { SimulationDevice } from '@mini-pms/contracts';
 
 @Injectable()
 export class DeviceService extends BaseService<DeviceEntity> {
@@ -25,6 +26,36 @@ export class DeviceService extends BaseService<DeviceEntity> {
     // BaseService'e Device repository'sini veriyoruz.
     // Böylece ortak veritabanı işlemlerini kullanabiliyoruz.
     super(repository);
+  }
+
+  /**
+   * Simülatörün ölçüm üreteceği aktif sayaçları getirir.
+   */
+  async findMetersForSimulation(): Promise<SimulationDevice[]> {
+    const rows = await this.repository
+      .createQueryBuilder('device')
+      .select('device.id', 'id')
+      .addSelect('device.serial_no', 'serialNo')
+      .addSelect('device.organization_unit_id', 'organizationUnitId')
+      .addSelect(
+        `CASE WHEN device.metadata ->> 'simulationProfile' = 'solar'
+         THEN 'solar' ELSE 'consumer' END`,
+        'simulationProfile',
+      )
+      // MAIN ve SECONDARY sayaç rolleri; METER mevcut testlerle uyumludur.
+      .where('device.role IN (:...roles)', {
+        roles: ['MAIN', 'SECONDARY', 'METER'],
+      })
+      .andWhere('device.is_active = :isActive', {
+        isActive: true,
+      })
+      .andWhere('device.is_deleted = :isDeleted', {
+        isDeleted: false,
+      })
+      .orderBy('device.id', 'ASC')
+      .getRawMany<SimulationDevice>();
+
+    return rows;
   }
 
   /**

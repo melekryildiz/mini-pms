@@ -10,70 +10,71 @@ import type {
   UnitHistory,
   UnitTopologyNode,
 } from '@/types/resources';
-
 export function UnitDetail({ id }: { id: string }) {
   const [unit, setUnit] = useState<Unit | null>(null);
   const [history, setHistory] = useState<PaginatedResult<UnitHistory>>({
     data: [],
     total: 0,
   });
-  /** Root Unit'ten mevcut Unit'e kadar olan sıralı breadcrumb yolu. */
+  /** Root Unit'ten mevcut Unit'e kadar olan sıralı yol. */
   const [breadcrumb, setBreadcrumb] = useState<UnitTopologyNode[]>([]);
   const [breadcrumbLoading, setBreadcrumbLoading] = useState(true);
   const [breadcrumbError, setBreadcrumbError] = useState('');
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    setError('');
-    setBreadcrumbError('');
-    setBreadcrumbLoading(true);
-
-    /**
-     * Detay/audit ve breadcrumb birbirinden bağımsızdır. allSettled sayesinde
-     * path geçici olarak başarısız olsa bile Unit detayını göstermeye devam
-     * ederiz. Breadcrumb için yalnız bir `/units/:id/path` isteği yapılır.
-     */
-    const [contentResult, breadcrumbResult] = await Promise.allSettled([
-      Promise.all([
+    try {
+      // Detay ve audit sorguları bağımsız olduğu için paralel başlatılır; ekran
+      // gereksiz yere iki ağ turu beklemez.
+      const [unitResult, historyResult] = await Promise.all([
         apiClient<Unit>(`/units/${id}`),
         apiClient<PaginatedResult<UnitHistory>>(
           `/units/${id}/history?page=1&limit=50`,
         ),
-      ]),
-      apiClient<GetUnitPathResponse>(`/units/${id}/path`),
-    ]);
-
-    if (contentResult.status === 'fulfilled') {
-      const [unitResult, historyResult] = contentResult.value;
+      ]);
       setUnit(unitResult);
       setHistory(historyResult);
-    } else {
-      const loadError: unknown = contentResult.reason;
-
+    } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : 'Birim yüklenemedi.',
       );
     }
-
-    if (breadcrumbResult.status === 'fulfilled') {
-      setBreadcrumb(breadcrumbResult.value.data);
-    } else {
-      const pathError: unknown = breadcrumbResult.reason;
-
-      // Breadcrumb hatası detay ve audit alanlarını kullanılamaz hale getirmez.
-      setBreadcrumbError(
-        pathError instanceof Error
-          ? pathError.message
-          : 'Birim yolu yüklenemedi.',
-      );
-    }
-
-    setBreadcrumbLoading(false);
   }, [id]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    setBreadcrumb([]);
+    setBreadcrumbLoading(true);
+    setBreadcrumbError('');
+
+    async function loadBreadcrumb(): Promise<void> {
+      try {
+        const result = await apiClient<GetUnitPathResponse>(`/units/${id}/path`, {
+          signal: controller.signal,
+        });
+        if (active) setBreadcrumb(result.data);
+      } catch (error: unknown) {
+        if (!active) return;
+        setBreadcrumbError(
+          error instanceof Error ? error.message : 'Birim yolu yüklenemedi.',
+        );
+      } finally {
+        if (active) setBreadcrumbLoading(false);
+      }
+    }
+
+    void loadBreadcrumb();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [id]);
 
   return (
     <section className="resource-page">
@@ -82,42 +83,29 @@ export function UnitDetail({ id }: { id: string }) {
       </Link>
       <nav aria-label="Birim hiyerarşisi" className="unit-breadcrumb">
         {breadcrumbLoading ? (
-          <span className="unit-breadcrumb-message">
-            Birim yolu yükleniyor…
-          </span>
+          <span className="unit-breadcrumb-message">Birim yolu yükleniyor…</span>
         ) : breadcrumbError ? (
           <span className="unit-breadcrumb-error" role="status">
             Breadcrumb gösterilemedi.
           </span>
         ) : (
           <ol>
-            {breadcrumb.map((item, index) => {
-              const isCurrent = index === breadcrumb.length - 1;
-
-              return (
-                <li key={item.id}>
-                  {index > 0 && (
-                    <span
-                      aria-hidden="true"
-                      className="unit-breadcrumb-separator"
-                    >
-                      /
-                    </span>
-                  )}
-
-                  {isCurrent ? (
-                    <span
-                      aria-current="page"
-                      className="unit-breadcrumb-current"
-                    >
-                      {item.code}
-                    </span>
-                  ) : (
-                    <Link href={`/units/${item.id}`}>{item.code}</Link>
-                  )}
-                </li>
-              );
-            })}
+            {breadcrumb.map((item, index) => (
+              <li key={item.id}>
+                {index > 0 && (
+                  <span aria-hidden="true" className="unit-breadcrumb-separator">
+                    /
+                  </span>
+                )}
+                {index === breadcrumb.length - 1 ? (
+                  <span aria-current="page" className="unit-breadcrumb-current">
+                    {item.code}
+                  </span>
+                ) : (
+                  <Link href={`/units/${item.id}`}>{item.code}</Link>
+                )}
+              </li>
+            ))}
           </ol>
         )}
       </nav>
