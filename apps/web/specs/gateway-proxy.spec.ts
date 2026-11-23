@@ -21,14 +21,72 @@ vi.mock('@/auth', () => ({
 
 vi.mock('@/lib/api', () => ({ gatewayFetch: mocks.gatewayFetch }));
 
-import { GET, POST } from '../src/app/api/gateway/[...path]/route';
+import {
+  DELETE,
+  GET,
+  PATCH,
+  POST,
+} from '../src/app/api/gateway/[...path]/route';
 
 const context = (path: string[]) => ({ params: Promise.resolve({ path }) });
 
 describe('authenticated API proxy', () => {
+  const topologyPaths = [
+    '/units/navigation/roots',
+    '/units/navigation/search',
+    '/units/7/navigation-children',
+    '/units/7/tree',
+    '/units/7/path',
+  ];
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.auth = { accessToken: 'server-only-token' };
+  });
+
+  it.each(topologyPaths)(
+    'forwards topology GET %s and its query',
+    async (path) => {
+      mocks.gatewayFetch.mockResolvedValue(Response.json({ data: [] }));
+      const response = await GET(
+        new NextRequest(`http://localhost/api/gateway${path}?limit=20`),
+        context(path.slice(1).split('/')),
+      );
+      expect(response?.status).toBe(200);
+      expect(mocks.gatewayFetch).toHaveBeenCalledWith(
+        path,
+        expect.objectContaining({
+          method: 'GET',
+          query: { limit: '20' },
+        }),
+      );
+    },
+  );
+
+  it.each(topologyPaths)(
+    'rejects writes to read-only topology route %s',
+    async (path) => {
+      for (const [method, handler] of [
+        ['POST', POST],
+        ['PATCH', PATCH],
+        ['DELETE', DELETE],
+      ] as const) {
+        const response = await handler(
+          new NextRequest(`http://localhost/api/gateway${path}`, { method }),
+          context(path.slice(1).split('/')),
+        );
+        expect(response?.status).toBe(404);
+      }
+      expect(mocks.gatewayFetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects unknown nested routes', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost/api/gateway/units/navigation/unknown'),
+      context(['units', 'navigation', 'unknown']),
+    );
+    expect(response?.status).toBe(404);
+    expect(mocks.gatewayFetch).not.toHaveBeenCalled();
   });
 
   it('rejects proxy access without an authenticated session', async () => {

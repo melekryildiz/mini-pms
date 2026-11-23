@@ -647,6 +647,4 @@ private escapeLikePattern(value: string): string {
   }
 }
 type UnitTopologySqlRow = UnitTopologyNode;
-
-/** Raw navigation sorgularındaki alias'ların contract karşılığı. */
 type UnitNavigationSqlRow = UnitNavigationNode;

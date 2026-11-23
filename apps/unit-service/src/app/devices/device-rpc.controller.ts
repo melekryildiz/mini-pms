@@ -60,6 +60,24 @@ export class DeviceRpcController {
       });
     }
   }
+  /**
+   * Simulator uygulamasına aktif sayaç listesini verir.
+   *
+   * Bu bir HTTP endpoint değildir. RabbitMQ message pattern'dir.
+   *
+   * Simulator şu pattern ile istek gönderecek:
+   *
+   * client.send('device.findMetersForSimulation', {})
+   *
+   * Unit Service aynı pattern'i dinleyerek sonucu RabbitMQ üzerinden
+   * simulator'a geri döndürecek.
+   */
+  @MessagePattern('device.findMetersForSimulation')
+  findMetersForSimulation() {
+    return this.handleRpc(() =>
+      this.deviceService.findMetersForSimulation(),
+    );
+  }
 
   /**
    * FIND ALL

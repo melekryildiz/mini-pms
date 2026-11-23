@@ -20,5 +20,9 @@
     "eslint.config.js",
     "eslint.config.cjs",
     "eslint.config.mjs"
+  ],
+  "references": [
+    { "path": "../../libs/contracts" },
+    { "path": "../../libs/modules/redis/tsconfig.lib.json" }
   ]
 }

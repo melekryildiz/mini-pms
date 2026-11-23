@@ -15,3 +15,18 @@ export type {
   SearchUnitsByCodeResponse,
 } from './units/types/unit-navigation.types.js';
 export * from './units/dto/search-units-by-code-query.dto.js';
+
+export type {
+  MeasurementEvent,
+  MeasurementSource,
+  SimulationMode,
+} from './measurements/types/measurement-event.types.js';
+export type {
+  SimulationDevice,
+} from './devices/types/simulation-device.types.js';
+export type {
+  UnitSubtreeMeter,
+  UnitInstantMeasurement,
+  UnitInstantMeter,
+  GetUnitInstantValuesResponse,
+} from './measurements/types/instant-values.types.js';

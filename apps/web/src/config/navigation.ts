@@ -30,6 +30,14 @@ export const navigationSections: ReadonlyArray<{
  */
 export const navigationItems: readonly NavigationItem[] = [
   {
+    label: 'Anlık İzleme',
+    href: '/instant-values',
+    description: 'Sayaçların son ölçümlerini görüntüle',
+    icon: 'A',
+    section: 'monitoring',
+    roles: ['admin', 'operator', 'viewer'],
+  },
+  {
     label: 'Genel Bakış',
     href: '/dashboard',
     description: 'Sistemin başlangıç ekranı',

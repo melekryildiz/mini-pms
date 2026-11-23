@@ -22,6 +22,11 @@ type SupportedMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
  * duyduğu mevcut backend yolları ve metotları buradan geçirilebilir.
  */
 function isAllowedRoute(path: string, method: SupportedMethod): boolean {
+  // Topoloji ağacının köklerini ve kodla arama sonuçlarını getirir.
+  if (/^\/units\/navigation\/(?:roots|search)$/.test(path)) {
+    return method === 'GET';
+  }
+
   if (/^\/(units|devices)$/.test(path)) {
     return method === 'GET' || method === 'POST';
   }
@@ -30,7 +35,11 @@ function isAllowedRoute(path: string, method: SupportedMethod): boolean {
     return ['GET', 'PATCH', 'DELETE'].includes(method);
   }
 
-  if (/^\/units\/[^/]+\/history$/.test(path)) {
+  if (
+    /^\/units\/[^/]+\/(?:history|instant-values|navigation-children|tree|path)$/.test(
+      path,
+    )
+  ) {
     return method === 'GET';
   }
 

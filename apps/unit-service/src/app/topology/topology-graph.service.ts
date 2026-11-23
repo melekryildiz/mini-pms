@@ -1,5 +1,6 @@
 import {
   Injectable,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 
 import {
@@ -16,6 +17,7 @@ import type {
 
 import type {
   UnitTopologyNode,
+  UnitSubtreeMeter,
 } from '@mini-pms/contracts';
 
 import {
@@ -432,6 +434,65 @@ export class TopologyGraphService {
       },
     );
   }
+  /**
+ * Kök birimin kendisi ve alt birimlerindeki aktif sayaçları getirir.
+ * Sayaç sayısı kadar sorgu göndermek yerine tek graph sorgusu kullanır.
+ */
+async getUnitSubtreeMeters(
+  unitId: string,
+): Promise<UnitSubtreeMeter[]> {
+  return this.neo4jService.executeRead(async (transaction) => {
+    const result = await transaction.run(
+      `
+        MATCH (root:Unit { id: $unitId })
+
+        OPTIONAL MATCH path =
+          (root)-[:CONTAINS*0..]->(unit:Unit)
+                -[:HAS_DEVICE]->(device:Device)
+
+        WHERE all(node IN nodes(path) WHERE node.isActive = true)
+          AND device.role IN $meterRoles
+
+        RETURN DISTINCT
+          device.id AS deviceId,
+          device.serialNo AS serialNo,
+          unit.id AS organizationUnitId,
+          unit.code AS unitCode,
+          unit.name AS unitName
+
+        ORDER BY unitCode, serialNo, deviceId
+      `,
+      {
+        unitId,
+        meterRoles: ['MAIN', 'SECONDARY', 'METER'],
+      },
+    );
+
+    // Birimin PostgreSQL'deki varlığını üstteki servis kontrol edecek.
+    // Burada root bulunamaması, graph kaydının eksik olduğunu gösterir.
+    if (result.records.length === 0) {
+      throw new ServiceUnavailableException(
+        'Birim graph üzerinde bulunamadı.',
+      );
+    }
+
+    // Birim var ama sayaç yoksa OPTIONAL MATCH null satır döndürür.
+    const meterRecords = result.records.filter(
+      (record) => record.get('deviceId') !== null,
+    );
+
+    return mapNeo4jRecords<UnitSubtreeMeter>(
+      meterRecords,
+      (data) => ({
+        deviceId: readString(data, 'deviceId'),
+        serialNo: readString(data, 'serialNo'),
+        organizationUnitId: readString(data, 'organizationUnitId'),
+        unitCode: readString(data, 'unitCode'),
+        unitName: readString(data, 'unitName'),
+      }),
+    );
+  });
+}
 }
 /**
  * Neo4j Record mapper tarafından normalize edilmiş veriyi ortak topology

@@ -8,6 +8,7 @@ describe('UnitsController topology endpoints', () => {
   const getNavigationRoots = jest.fn();
   const getNavigationChildren = jest.fn();
   const searchNavigationByCode = jest.fn();
+  const getUnitInstantValues = jest.fn();
 
   const controller = new UnitsController({
     getTree,
@@ -15,10 +16,18 @@ describe('UnitsController topology endpoints', () => {
     getNavigationRoots,
     getNavigationChildren,
     searchNavigationByCode,
+    getUnitInstantValues,
   } as unknown as UnitsService);
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('anlık değer isteğini URLdeki birim kimliğiyle service katmanına aktarır', async () => {
+    const response = { unitId: '10', meters: [] };
+    getUnitInstantValues.mockResolvedValueOnce(response);
+    await expect(controller.getUnitInstantValues('10')).resolves.toBe(response);
+    expect(getUnitInstantValues).toHaveBeenCalledWith('10');
   });
 
   it('tree isteğini URL parametresindeki id ile service katmanına aktarır', async () => {
@@ -67,6 +76,7 @@ describe('UnitsController topology endpoints', () => {
   });
 
   it.each([
+    ['instant-values', UnitsController.prototype.getUnitInstantValues],
     ['tree', UnitsController.prototype.getTree],
     ['path', UnitsController.prototype.getPath],
     ['roots', UnitsController.prototype.getNavigationRoots],
