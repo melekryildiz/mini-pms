@@ -1,5 +1,7 @@
 import {
   IsString,
+  IsIn,
+  ValidateIf,
   IsNotEmpty,
   IsOptional,
   IsObject,
@@ -31,9 +33,19 @@ export class CreateDeviceDto {
     example: 'MAIN',
     description: 'Device role',
   })
-  @IsString()
-  @IsNotEmpty()
+  @IsIn(['MAIN', 'FEEDER'])
   role!: string;
+
+  @ApiPropertyOptional({
+    example: '1',
+    description: 'Pozitif sayaç çarpanı; en fazla 6 ondalık basamak',
+  })
+  @ValidateIf((_object, value) => value !== undefined)
+  @Matches(/^(?:(?:[1-9]\d{0,11})(?:\.\d{1,6})?|0\.(?=\d{0,5}[1-9])\d{1,6})$/, {
+    message:
+      'multiplier must be a positive decimal string with at most 12 integer and 6 fractional digits',
+  })
+  multiplier?: string;
 
   @ApiPropertyOptional({
     type: 'object',

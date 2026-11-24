@@ -64,6 +64,23 @@ describe('MeasurementOrchestrator', () => {
 
   afterEach(() => jest.useRealTimers());
 
+  it('Redis ham mesajı değil çarpan uygulanmış kayıt sonucunu alır', async () => {
+    const normalized = {
+      ...event,
+      activeImportKwh: 100,
+      inductiveKvarh: 20,
+      capacitiveKvarh: 5,
+    };
+    store.mockResolvedValue({ status: 'inserted', measurement: normalized });
+    await orchestrator.process(source());
+    expect(update).toHaveBeenCalledWith(normalized);
+    storeBatch.mockResolvedValue([
+      { status: 'duplicate', measurement: normalized },
+    ]);
+    await orchestrator.processBatch([source()]);
+    expect(updateMany).toHaveBeenCalledWith([normalized]);
+  });
+
   describe('processBatch', () => {
     it('karışık grupta sonuçları orijinal kaynaklarla eşler', async () => {
       const events = [
@@ -75,13 +92,11 @@ describe('MeasurementOrchestrator', () => {
       const messages = [
         source(),
         { ...source('{broken'), offset: '43' },
-        ...events
-          .slice(1)
-          .map((item, index) => ({
-            ...source(JSON.stringify(item)),
-            key: item.deviceId,
-            offset: String(44 + index),
-          })),
+        ...events.slice(1).map((item, index) => ({
+          ...source(JSON.stringify(item)),
+          key: item.deviceId,
+          offset: String(44 + index),
+        })),
       ];
       storeBatch.mockResolvedValueOnce([
         { status: 'inserted' },

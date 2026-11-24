@@ -31,6 +31,52 @@ describe('MeasurementStoreService', () => {
     } as unknown as Repository<IntervalEntity>);
   });
 
+  it('çarpılmış DB değerlerini Redis için döndürür; SQL çarpanı kayıt anında okur', async () => {
+    query.mockResolvedValueOnce([
+      {
+        id: '1',
+        active_import_kwh: '100',
+        active_export_kwh: '0',
+        inductive_kvarh: '20',
+        capacitive_kvarh: '5',
+      },
+    ]);
+    await expect(service.store(event)).resolves.toMatchObject({
+      status: 'inserted',
+      measurement: {
+        activeImportKwh: 100,
+        activeExportKwh: 0,
+        inductiveKvarh: 20,
+        capacitiveKvarh: 5,
+      },
+    });
+    expect(query.mock.calls[0][0]).toContain(
+      'SELECT multiplier FROM mini_pms.device',
+    );
+    expect(query.mock.calls[0][0]).toContain('multiplier_applied');
+  });
+
+  it('replay çarpanı değiştirmez; kayıtlı çarpan ile karşılaştırır', async () => {
+    query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          same_values: true,
+          active_import_kwh: '100',
+          active_export_kwh: '0',
+          inductive_kvarh: '20',
+          capacitive_kvarh: '5',
+        },
+      ]);
+    await expect(service.store(event)).resolves.toMatchObject({
+      status: 'duplicate',
+      measurement: { activeImportKwh: 100 },
+    });
+    expect(query.mock.calls[1][0]).toContain(
+      '$3::numeric * multiplier_applied',
+    );
+  });
+
   it('yeni kaydı parametreli SQL ile ekler', async () => {
     query.mockResolvedValueOnce([{ id: '1' }]);
     await expect(service.store(event)).resolves.toEqual({ status: 'inserted' });

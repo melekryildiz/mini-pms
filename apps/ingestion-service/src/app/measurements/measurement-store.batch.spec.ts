@@ -133,10 +133,10 @@ describe('MeasurementStoreService.storeBatch', () => {
       { status: 'conflict', reason: expect.any(String) },
     ]);
     expect(batchQuery.mock.calls[0][0]).toContain(
-      'SELECT DISTINCT ON (device_id, period_start)',
+      'SELECT DISTINCT ON (input.device_id, input.period_start)',
     );
     expect(batchQuery.mock.calls[0][0]).toContain(
-      'ORDER BY device_id, period_start, ordinal',
+      'ORDER BY input.device_id, input.period_start, input.ordinal',
     );
   });
 

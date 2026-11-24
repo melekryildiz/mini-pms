@@ -1,10 +1,4 @@
-import {
-  Check,
-  Column,
-  Entity,
-  PrimaryGeneratedColumn,
-  Unique,
-} from 'typeorm';
+import { Check, Column, Entity, PrimaryGeneratedColumn, Unique } from 'typeorm';
 
 /** Mevcut migration'daki 15 dakikalık enerji tablosu. */
 @Entity({ schema: 'mini_pms', name: 'interval' })
@@ -29,6 +23,10 @@ export class IntervalEntity {
 
   @Column({ type: 'timestamptz' })
   period_start!: Date;
+
+  // Ölçümün ilk kaydında uygulanan çarpan; replay sırasında değişmez.
+  @Column({ type: 'numeric', precision: 18, scale: 6, default: '1' })
+  multiplier_applied!: string;
 
   // PostgreSQL NUMERIC değerlerini hassasiyet kaybetmeden okur.
   @Column({ type: 'numeric' })

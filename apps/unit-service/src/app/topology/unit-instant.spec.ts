@@ -33,7 +33,7 @@ describe('Alt ağaç sayaçları', () => {
     expect(run.mock.calls[0][0]).toContain('[:HAS_DEVICE]');
     expect(run.mock.calls[0][1]).toEqual({
       unitId: '1',
-      meterRoles: ['MAIN', 'SECONDARY', 'METER'],
+      meterRoles: ['MAIN', 'FEEDER'],
     });
   });
   it('graph kökü yoksa 503 döndürür', async () => {

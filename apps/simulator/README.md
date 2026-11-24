@@ -78,3 +78,22 @@ Yaptığımız testlerde:
 Mesajları görmek için http://localhost:8080 adresini aç:
 Topics → mpms.measurement.raw → Messages.
 Burada mesajın key'ini, partition'ını ve içeriğini görebilirsin.
+
+## Sayaç rolü ve çarpan
+
+Simülatör aktif MAIN ve FEEDER sayaçlarına ham 15 dakikalık enerji üretir.
+Çarpanı simülatör uygulamaz. Ingestion, device.multiplier değerini dört enerjiye
+uygular ve ölçümde kullanılan çarpanı interval.multiplier_applied alanında saklar.
+Böylece replay aynı döneme yeni çarpan uygulamaz. Yeni dönemlerde güncel çarpan
+kullanılır; geçmişe ilk kez gelen backfill de kayıt anındaki çarpanı kullanır.
+Çarpanın tarih aralıklı yönetimi henüz yoktur.
+
+API'de multiplier decimal string olarak gönderilir (ör. "2.5"); varsayılan "1".
+Seri numarası silinmiş sayaçlarda da yeniden kullanılamaz.
+Bir birimde birden fazla aktif FEEDER olabilir; aktif MAIN en fazla bir tanedir.
+
+Gerçek DB kontrolü:
+
+```bash
+node --env-file=.env apps/ingestion-service/scripts/verify-meter-rules.cjs
+```

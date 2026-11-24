@@ -464,7 +464,7 @@ async getUnitSubtreeMeters(
       `,
       {
         unitId,
-        meterRoles: ['MAIN', 'SECONDARY', 'METER'],
+        meterRoles: ['MAIN', 'FEEDER'],
       },
     );
 

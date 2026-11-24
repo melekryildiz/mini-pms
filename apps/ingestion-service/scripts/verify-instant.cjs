@@ -149,7 +149,7 @@ async function main() {
       await db.query(
         `INSERT INTO mini_pms.device (organization_unit_id,serial_no,role,is_active,created_by)
     SELECT CASE WHEN n<=50 THEN $1::bigint WHEN n<=102 THEN $2::bigint ELSE $3::bigint END,$4||'-M-'||n,
-    CASE WHEN n=102 THEN 'OTHER' ELSE 'MAIN' END,n<>101,$4 FROM generate_series(1,103) AS n
+    CASE WHEN n IN (1,51,103) THEN 'MAIN' ELSE 'FEEDER' END,n NOT IN (101,102),$4 FROM generate_series(1,103) AS n
     RETURNING id,serial_no,organization_unit_id,role,is_active`,
         [tm.id, transformer.id, other.id, id],
       )
@@ -175,7 +175,9 @@ async function main() {
     }
     const expected = devices.filter(
       (d) =>
-        d.is_active && d.role === 'MAIN' && d.organization_unit_id !== other.id,
+        d.is_active &&
+        ['MAIN', 'FEEDER'].includes(d.role) &&
+        d.organization_unit_id !== other.id,
     );
     assert.equal(expected.length, 100);
     const startMs = Math.floor(Date.now() / 900000) * 900000 - 900000;

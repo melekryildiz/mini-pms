@@ -13,6 +13,7 @@ type DeviceForm = {
   organization_unit_id: string;
   serial_no: string;
   role: string;
+  multiplier: string;
   metadata: string;
   is_active: boolean;
 };
@@ -20,6 +21,7 @@ const emptyForm: DeviceForm = {
   organization_unit_id: '',
   serial_no: '',
   role: 'MAIN',
+  multiplier: '1',
   metadata: '{}',
   is_active: true,
 };
@@ -89,6 +91,7 @@ export function DevicesManager({ roles }: { roles: AppRole[] }) {
       organization_unit_id: device.organization_unit_id,
       serial_no: device.serial_no,
       role: device.role,
+      multiplier: device.multiplier ?? '1',
       metadata: JSON.stringify(device.metadata, null, 2),
       is_active: device.is_active,
     });
@@ -118,6 +121,7 @@ export function DevicesManager({ roles }: { roles: AppRole[] }) {
         ? {
             serial_no: form.serial_no,
             role: form.role,
+            multiplier: form.multiplier,
             metadata,
             is_active: form.is_active,
           }
@@ -125,6 +129,7 @@ export function DevicesManager({ roles }: { roles: AppRole[] }) {
             organization_unit_id: form.organization_unit_id,
             serial_no: form.serial_no,
             role: form.role,
+            multiplier: form.multiplier,
             metadata,
           };
       await apiClient(editing ? `/devices/${editing.id}` : '/devices', {
@@ -140,6 +145,7 @@ export function DevicesManager({ roles }: { roles: AppRole[] }) {
         'organization_unit_id',
         'serial_no',
         'role',
+        'multiplier',
         'metadata',
         'is_active',
       ] as const);
@@ -227,6 +233,7 @@ export function DevicesManager({ roles }: { roles: AppRole[] }) {
                   <th>Seri no</th>
                   <th>Birim</th>
                   <th>Rol</th>
+                  <th>Çarpan</th>
                   <th>Durum</th>
                   <th>İşlemler</th>
                 </tr>
@@ -237,6 +244,7 @@ export function DevicesManager({ roles }: { roles: AppRole[] }) {
                     <td>{device.serial_no}</td>
                     <td>{device.organization_unit_id}</td>
                     <td>{device.role}</td>
+                    <td>{device.multiplier}</td>
                     <td>
                       <span
                         className={
@@ -336,15 +344,38 @@ export function DevicesManager({ roles }: { roles: AppRole[] }) {
             </label>
             <label>
               Cihaz rolü
-              <input
+              <select
                 required
                 value={form.role}
                 onChange={(event) =>
                   setForm({ ...form, role: event.target.value })
                 }
-              />
+              >
+                <option value="MAIN">MAIN — Ana sayaç</option>
+                <option value="FEEDER">FEEDER — Fider sayacı</option>
+              </select>
               {fieldErrors.role && (
                 <small className="field-error">{fieldErrors.role}</small>
+              )}
+            </label>
+            <label>
+              Çarpan
+              <input
+                type="number"
+                required
+                min="0.000001"
+                max="999999999999.999999"
+                step="0.000001"
+                value={form.multiplier}
+                onChange={(event) =>
+                  setForm({ ...form, multiplier: event.target.value })
+                }
+              />
+              <small>
+                Ham enerji bu değerle çarpılır. Çarpan yoksa 1 kullanılır.
+              </small>
+              {fieldErrors.multiplier && (
+                <small className="field-error">{fieldErrors.multiplier}</small>
               )}
             </label>
             <label>
