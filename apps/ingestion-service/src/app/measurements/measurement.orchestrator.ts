@@ -58,11 +58,12 @@ export class MeasurementOrchestrator {
 
     // 3. Yeni kayıt ve duplicate için son değeri kontrol et.
     // Aynı veya eski dönem Redis'teki değeri değiştirmez.
-    await this.latestService.updateIfNewer(measurement);
+    const normalized = result.measurement ?? measurement;
+    await this.latestService.updateIfNewer(normalized);
 
     return {
       status: result.status,
-      measurement,
+      measurement: normalized,
     };
   }
 
@@ -157,11 +158,12 @@ export class MeasurementOrchestrator {
         }
 
         // Şimdilik listeye al; bütün sonuçlar değerlendirildikten sonra gönder.
-        accepted.push(item.measurement);
+        const normalized = result.measurement ?? item.measurement;
+        accepted.push(normalized);
 
         results.set(item.index, {
           status: result.status,
-          measurement: item.measurement,
+          measurement: normalized,
         });
       }
     }

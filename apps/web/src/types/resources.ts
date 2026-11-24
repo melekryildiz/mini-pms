@@ -34,6 +34,7 @@ export type Device = {
   organization_unit_id: string;
   serial_no: string;
   role: string;
+  multiplier: string;
   metadata: Record<string, unknown>;
   is_active: boolean;
   created_at: string;

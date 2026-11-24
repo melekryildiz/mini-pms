@@ -7,7 +7,7 @@ import {
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository, DeepPartial, EntityManager } from 'typeorm';
+import { Repository, DeepPartial, EntityManager, Not } from 'typeorm';
 
 import type { FindOptionsWhere, FindOptionsOrder } from 'typeorm';
 
@@ -42,9 +42,9 @@ export class DeviceService extends BaseService<DeviceEntity> {
          THEN 'solar' ELSE 'consumer' END`,
         'simulationProfile',
       )
-      // MAIN ve SECONDARY sayaç rolleri; METER mevcut testlerle uyumludur.
+      // Simülatör yalnız tanımlı sayaç rollerini üretir.
       .where('device.role IN (:...roles)', {
-        roles: ['MAIN', 'SECONDARY', 'METER'],
+        roles: ['MAIN', 'FEEDER'],
       })
       .andWhere('device.is_active = :isActive', {
         isActive: true,
@@ -83,7 +83,12 @@ export class DeviceService extends BaseService<DeviceEntity> {
       : this.repository.manager.getRepository(UnitEntity);
 
     // İstekten gelen cihaz bilgilerini ayırıyoruz.
-    const { organization_unit_id, serial_no, role, metadata } = data;
+    const { organization_unit_id, role, metadata } = data;
+    const serial_no =
+      typeof data.serial_no === 'string' ? data.serial_no.trim() : '';
+    this.validateMeterFields(role, data.multiplier ?? '1');
+    if (data.multiplier === null)
+      throw new BadRequestException('Invalid multiplier');
 
     // 1. Zorunlu alanların gönderildiğini kontrol ediyoruz.
     if (!organization_unit_id || !serial_no || !role) {
@@ -112,18 +117,22 @@ export class DeviceService extends BaseService<DeviceEntity> {
       );
     }
 
-    // 3. Aynı seri numarasına sahip aktif kayıt var mı?
-    // Silinmemiş cihazlar arasında tekrar istemiyoruz.
+    // 3. Seri numarası, silinmiş kayıtlar dahil benzersizdir.
     const existingDevice = await deviceRepository.findOne({
-      where: {
-        serial_no,
-        is_deleted: false,
-      },
+      where: { serial_no },
+      withDeleted: true,
     });
 
     if (existingDevice) {
       throw new ConflictException('Device serial number already exists');
     }
+
+    await this.ensureSingleMain(
+      deviceRepository,
+      organization_unit_id,
+      role,
+      true,
+    );
 
     // 4. Sadece izin verilen alanlarla entity oluşturuyoruz.
     // Metadata gönderilmediyse boş nesne kullanıyoruz.
@@ -131,12 +140,13 @@ export class DeviceService extends BaseService<DeviceEntity> {
       organization_unit_id,
       serial_no,
       role,
+      multiplier: data.multiplier ?? '1',
       metadata: metadata ?? {},
       created_by,
     });
 
     // Oluşturulan cihazı veritabanına kaydediyoruz.
-    return deviceRepository.save(device);
+    return this.saveMeter(deviceRepository, device);
   }
 
   /**
@@ -176,7 +186,13 @@ export class DeviceService extends BaseService<DeviceEntity> {
 
     // 2. Güncellenmesine izin verdiğimiz alanları tanımlıyoruz.
     // Örneğin organization_unit_id değiştirilemez.
-    const allowedFields = ['serial_no', 'role', 'metadata', 'is_active'];
+    const allowedFields = [
+      'serial_no',
+      'role',
+      'multiplier',
+      'metadata',
+      'is_active',
+    ];
 
     // İzin verilmeyen bir alan gönderilmiş mi?
     const invalidFields = Object.keys(data).filter(
@@ -189,6 +205,15 @@ export class DeviceService extends BaseService<DeviceEntity> {
       );
     }
 
+    if (typeof data.serial_no === 'string')
+      data = { ...data, serial_no: data.serial_no.trim() };
+    this.validateMeterFields(
+      data.role ?? device.role,
+      data.multiplier ?? device.multiplier ?? '1',
+    );
+    if (data.role === null || data.multiplier === null)
+      throw new BadRequestException('Invalid role or multiplier');
+
     // 3. Seri numarası değiştiriliyorsa kontrol ediyoruz.
     if (data.serial_no !== undefined && data.serial_no !== device.serial_no) {
       // Yeni seri numarası boş olamaz.
@@ -200,8 +225,8 @@ export class DeviceService extends BaseService<DeviceEntity> {
       const existingDevice = await deviceRepository.findOne({
         where: {
           serial_no: data.serial_no,
-          is_deleted: false,
         },
+        withDeleted: true,
       });
 
       if (existingDevice && existingDevice.id !== device.id) {
@@ -250,6 +275,14 @@ export class DeviceService extends BaseService<DeviceEntity> {
       }
     }
 
+    await this.ensureSingleMain(
+      deviceRepository,
+      device.organization_unit_id,
+      data.role ?? device.role,
+      data.is_active ?? device.is_active,
+      device.id,
+    );
+
     // 8. Yalnızca istekte bulunan alanları güncelliyoruz.
     // undefined olan alanlar mevcut değerlerini koruyor.
     deviceRepository.merge(device, {
@@ -259,6 +292,7 @@ export class DeviceService extends BaseService<DeviceEntity> {
       ...(data.role !== undefined && {
         role: data.role,
       }),
+      ...(data.multiplier !== undefined && { multiplier: data.multiplier }),
       ...(data.metadata !== undefined && {
         metadata: data.metadata,
       }),
@@ -269,7 +303,7 @@ export class DeviceService extends BaseService<DeviceEntity> {
     });
 
     // Güncellenmiş cihazı kaydediyoruz.
-    return deviceRepository.save(device);
+    return this.saveMeter(deviceRepository, device);
   }
 
   /**
@@ -372,5 +406,70 @@ export class DeviceService extends BaseService<DeviceEntity> {
       data,
       total,
     };
+  }
+  private validateMeterFields(role: unknown, multiplier: unknown): void {
+    if (role !== 'MAIN' && role !== 'FEEDER') {
+      throw new BadRequestException('role must be MAIN or FEEDER');
+    }
+    if (
+      typeof multiplier !== 'string' ||
+      !/^(?:(?:[1-9]\d{0,11})(?:\.\d{1,6})?|0\.(?=\d{0,5}[1-9])\d{1,6})$/.test(
+        multiplier,
+      )
+    ) {
+      throw new BadRequestException(
+        'multiplier must be a positive decimal string with at most 6 fractional digits',
+      );
+    }
+  }
+
+  private async ensureSingleMain(
+    repository: Repository<DeviceEntity>,
+    unitId: string,
+    role: string,
+    active: boolean,
+    exceptId?: string,
+  ): Promise<void> {
+    if (role !== 'MAIN' || !active) return;
+    const existing = await repository.findOne({
+      where: {
+        organization_unit_id: unitId,
+        role: 'MAIN',
+        is_active: true,
+        is_deleted: false,
+        ...(exceptId ? { id: Not(exceptId) } : {}),
+      },
+    });
+    if (existing)
+      throw new ConflictException('This unit already has an active MAIN meter');
+  }
+
+  private async saveMeter(
+    repository: Repository<DeviceEntity>,
+    device: DeviceEntity,
+  ): Promise<DeviceEntity> {
+    try {
+      return await repository.save(device);
+    } catch (error: unknown) {
+      const detail = (
+        error as { driverError?: { code?: string; constraint?: string } }
+      )?.driverError;
+      // Ön kontrol yarışları önlemez; unique index son savunmadır.
+      if (
+        detail?.code === '23505' &&
+        detail.constraint === 'uq_device_active_main_per_unit'
+      ) {
+        throw new ConflictException(
+          'This unit already has an active MAIN meter',
+        );
+      }
+      if (
+        detail?.code === '23505' &&
+        detail.constraint === 'uq_device_serial_no'
+      ) {
+        throw new ConflictException('Device serial number already exists');
+      }
+      throw error;
+    }
   }
 }

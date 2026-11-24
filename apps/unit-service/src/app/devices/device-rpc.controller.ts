@@ -3,12 +3,14 @@ import {
   HttpException,
   HttpStatus,
   NotFoundException,
+  UseFilters,
 } from '@nestjs/common';
 
 import { MessagePattern, Payload, RpcException } from '@nestjs/microservices';
 
 import { DeviceService } from './device.service.js';
 import { DeviceOrchestrator } from './device.orchestrator.js';
+import { DeviceRpcExceptionFilter } from './device-rpc-exception.filter.js';
 
 import {
   CreateDeviceDto,
@@ -17,6 +19,7 @@ import {
 } from '@mini-pms/contracts';
 
 @Controller()
+@UseFilters(new DeviceRpcExceptionFilter())
 export class DeviceRpcController {
   constructor(
     private readonly deviceService: DeviceService,
@@ -74,9 +77,7 @@ export class DeviceRpcController {
    */
   @MessagePattern('device.findMetersForSimulation')
   findMetersForSimulation() {
-    return this.handleRpc(() =>
-      this.deviceService.findMetersForSimulation(),
-    );
+    return this.handleRpc(() => this.deviceService.findMetersForSimulation());
   }
 
   /**

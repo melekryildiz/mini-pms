@@ -161,7 +161,7 @@ async function main() {
       await db.query(
         `INSERT INTO mini_pms.device
       (organization_unit_id, serial_no, role, is_active, created_by)
-      VALUES ($1,$2,'TEST',false,$2) RETURNING id, serial_no, organization_unit_id`,
+      VALUES ($1,$2,'FEEDER',false,$2) RETURNING id, serial_no, organization_unit_id`,
         [unit.id, runId],
       )
     ).rows[0];
